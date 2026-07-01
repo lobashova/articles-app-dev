@@ -69,3 +69,16 @@ def create_tag(tag: schemas.TagCreate, db: Session = Depends(get_db)):
 def get_tags(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     tags = db.query(models.Tag).offset(skip).limit(limit).all()
     return tags
+
+# Эндпоинт: Привязать тег к статье
+@app.post("/articles/{article_id}/tags/{tag_id}")
+def add_tag_to_article(article_id: int, tag_id: int, db: Session = Depends(get_db)):
+    article = db.query(models.Article).filter(models.Article.id == article_id).first()
+    tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
+    
+    if not article or not tag:
+        return {"error": "Статья или тег не найдены"}
+    
+    article.tags.append(tag)
+    db.commit()
+    return {"message": "Тег успешно привязан"}

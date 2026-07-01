@@ -1,6 +1,24 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Table, ForeignKey
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from database import Base
+
+# Таблица связи для Тегов и Статей
+article_tags = Table(
+    "article_tags",
+    Base.metadata,
+    Column("article_id", ForeignKey("articles.id"), primary_key=True),
+    Column("tag_id", ForeignKey("tags.id"), primary_key=True),
+)
+
+# Таблица связи для Проектов и Статей
+project_articles = Table(
+    "project_articles",
+    Base.metadata,
+    Column("project_id", ForeignKey("projects.id"), primary_key=True),
+    Column("article_id", ForeignKey("articles.id"), primary_key=True),
+)
 
 class User(Base):
     __tablename__ = "users"
@@ -33,9 +51,20 @@ class Article(Base):
     issue = Column(String, nullable=True)
     edition = Column(String, nullable=True)
     pages = Column(String, nullable=True)
+    tags = relationship("Tag", secondary=article_tags, backref="articles")
+    projects = relationship("Project", secondary=project_articles, backref="articles")
 
 class Tag(Base):
     __tablename__ = "tags"
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True, nullable=False)
+
+
+class Note(Base):
+    __tablename__ = "notes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    article_id = Column(Integer, ForeignKey("articles.id"))
+    field_type = Column(String)  # Например: 'aims', 'methods', 'results'
+    content = Column(Text)
