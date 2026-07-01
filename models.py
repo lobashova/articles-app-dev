@@ -82,3 +82,11 @@ class ArticleAuthor(Base):
     article_id = Column(Integer, ForeignKey("articles.id"), primary_key=True)
     author_id = Column(Integer, ForeignKey("authors.id"), primary_key=True)
     order_index = Column(Integer)  # Порядок автора (1-й, 2-й...)
+
+class Draft(Base):
+    __tablename__ = "drafts"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"))
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=True) # Здесь будет ваш Markdown-текст

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import models, schemas
 from database import engine, SessionLocal
@@ -96,3 +97,32 @@ def create_note(article_id: int, note: schemas.NoteCreate, db: Session = Depends
 @app.get("/articles/{article_id}/notes/", response_model=list[schemas.NoteResponse])
 def get_notes(article_id: int, db: Session = Depends(get_db)):
     return db.query(models.Note).filter(models.Note.article_id == article_id).all()
+
+# Эндпоинт: Поиск статей
+@app.get("/search/")
+def search_articles(query: str, db: Session = Depends(get_db)):
+    # Ищем вхождение строки в название или абстракт
+    results = db.query(models.Article).filter(
+        or_(
+            models.Article.title.ilike(f"%{query}%"),
+            models.Article.abstract.ilike(f"%{query}%")
+        )
+    ).all()
+    return results
+
+# Эндпоинт: Создать драфт
+@app.post("/drafts/")
+def create_draft(project_id: int, title: str, db: Session = Depends(get_db)):
+    db_draft = models.Draft(project_id=project_id, title=title)
+    db.add(db_draft)
+    db.commit()
+    db.refresh(db_draft)
+    return db_draft
+
+# Эндпоинт: Сохранить/обновить текст драфта
+@app.put("/drafts/{draft_id}")
+def update_draft(draft_id: int, content: str, db: Session = Depends(get_db)):
+    draft = db.query(models.Draft).filter(models.Draft.id == draft_id).first()
+    draft.content = content
+    db.commit()
+    return {"message": "Draft saved"}
