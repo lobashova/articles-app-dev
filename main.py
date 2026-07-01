@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import models, schemas
@@ -11,6 +12,19 @@ import os
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Article Management API")
+
+origins = [
+    "http://localhost:5173",  # Адрес, где работает ваш Vue.js при разработке
+    "https://articles-app.ru", # Адрес вашего домена
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Зависимость для получения сессии базы данных
 def get_db():
