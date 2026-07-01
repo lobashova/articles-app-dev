@@ -68,3 +68,17 @@ class Note(Base):
     article_id = Column(Integer, ForeignKey("articles.id"))
     field_type = Column(String)  # Например: 'aims', 'methods', 'results'
     content = Column(Text)
+
+class Author(Base):
+    __tablename__ = "authors"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    last_name = Column(String, index=True, nullable=False)
+    initials = Column(String, nullable=False)
+
+class ArticleAuthor(Base):
+    __tablename__ = "article_authors"
+    
+    article_id = Column(Integer, ForeignKey("articles.id"), primary_key=True)
+    author_id = Column(Integer, ForeignKey("authors.id"), primary_key=True)
+    order_index = Column(Integer)  # Порядок автора (1-й, 2-й...)

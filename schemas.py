@@ -55,3 +55,29 @@ class TagResponse(TagBase):
 
     class Config:
         from_attributes = True
+
+# --- ЗАМЕТКИ ---
+class NoteBase(BaseModel):
+    field_type: str  # 'aims', 'methods', 'results', etc.
+    content: str
+
+class NoteCreate(NoteBase):
+    pass
+
+class NoteResponse(NoteBase):
+    id: int
+    article_id: int
+
+    class Config:
+        from_attributes = True
+
+# --- АВТОРЫ ---
+class AuthorBase(BaseModel):
+    last_name: str
+    initials: str
+
+class AuthorResponse(AuthorBase):
+    id: int
+
+    class Config:
+        from_attributes = True

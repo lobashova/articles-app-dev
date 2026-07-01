@@ -82,3 +82,17 @@ def add_tag_to_article(article_id: int, tag_id: int, db: Session = Depends(get_d
     article.tags.append(tag)
     db.commit()
     return {"message": "Тег успешно привязан"}
+
+# Эндпоинт: Добавить заметку к статье
+@app.post("/articles/{article_id}/notes/", response_model=schemas.NoteResponse)
+def create_note(article_id: int, note: schemas.NoteCreate, db: Session = Depends(get_db)):
+    db_note = models.Note(article_id=article_id, **note.dict())
+    db.add(db_note)
+    db.commit()
+    db.refresh(db_note)
+    return db_note
+
+# Эндпоинт: Получить все заметки к статье
+@app.get("/articles/{article_id}/notes/", response_model=list[schemas.NoteResponse])
+def get_notes(article_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Note).filter(models.Note.article_id == article_id).all()
