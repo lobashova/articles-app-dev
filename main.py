@@ -3,6 +3,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import models, schemas
 from database import engine, SessionLocal
+from fastapi import UploadFile, File
+import shutil
+import os
 
 # Создаем таблицы, если их нет
 models.Base.metadata.create_all(bind=engine)
@@ -126,3 +129,15 @@ def update_draft(draft_id: int, content: str, db: Session = Depends(get_db)):
     draft.content = content
     db.commit()
     return {"message": "Draft saved"}
+
+UPLOAD_DIR = "uploaded_files"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@app.post("/upload-article/")
+async def upload_article(file: UploadFile = File(...)):
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Здесь можно вызвать функцию extract_text_from_pdf(file_path)
+    return {"filename": file.filename, "path": file_path}
