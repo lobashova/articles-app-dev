@@ -38,3 +38,34 @@ def create_project(project: schemas.ProjectCreate, db: Session = Depends(get_db)
 def get_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     projects = db.query(models.Project).offset(skip).limit(limit).all()
     return projects
+
+# Эндпоинт: Добавить новую статью
+@app.post("/articles/", response_model=schemas.ArticleResponse)
+def create_article(article: schemas.ArticleCreate, db: Session = Depends(get_db)):
+    # .dict() превращает данные от пользователя в формат для базы данных
+    db_article = models.Article(**article.dict())
+    db.add(db_article)
+    db.commit()
+    db.refresh(db_article)
+    return db_article
+
+# Эндпоинт: Получить список всех статей
+@app.get("/articles/", response_model=list[schemas.ArticleResponse])
+def get_articles(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    articles = db.query(models.Article).offset(skip).limit(limit).all()
+    return articles
+
+# Эндпоинт: Создать новый тег
+@app.post("/tags/", response_model=schemas.TagResponse)
+def create_tag(tag: schemas.TagCreate, db: Session = Depends(get_db)):
+    db_tag = models.Tag(name=tag.name)
+    db.add(db_tag)
+    db.commit()
+    db.refresh(db_tag)
+    return db_tag
+
+# Эндпоинт: Получить список всех тегов
+@app.get("/tags/", response_model=list[schemas.TagResponse])
+def get_tags(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    tags = db.query(models.Tag).offset(skip).limit(limit).all()
+    return tags
