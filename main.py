@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import or_
@@ -10,6 +11,20 @@ import os
 
 # Создаем таблицы, если их нет
 models.Base.metadata.create_all(bind=engine)
+
+# Настройка логирования
+LOG_FILE_PATH = "/var/www/article-app/logs/app.log"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE_PATH),
+        logging.StreamHandler() # Чтобы логи также писались в системный журнал
+    ]
+)
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Article Management API")
 
