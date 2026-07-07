@@ -1,11 +1,10 @@
 import logging
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import models, schemas
 from database import engine, SessionLocal
-from fastapi import UploadFile, File
 import shutil
 import os
 
@@ -72,6 +71,31 @@ def get_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db))
     projects = db.query(models.Project).offset(skip).limit(limit).all()
     return projects
 
+# Эндпоинт: Обновить проект
+@app.put("/projects/{project_id}", response_model=schemas.ProjectResponse)
+def update_project(project_id: int, project: schemas.ProjectCreate, db: Session = Depends(get_db)):
+    db_project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    db_project.name = project.name
+    db_project.description = project.description
+    db_project.goals = project.goals
+    db.commit()
+    db.refresh(db_project)
+    return db_project
+
+# Эндпоинт: Удалить проект
+@app.delete("/projects/{project_id}")
+def delete_project(project_id: int, db: Session = Depends(get_db)):
+    db_project = db.query(models.Project).filter(models.Project.id == project_id).first()
+    if not db_project:
+        raise HTTPException(status_code=404, detail="Проект не найден")
+    
+    db.delete(db_project)
+    db.commit()
+    return {"message": "Проект успешно удален"}
+
 # Эндпоинт: Добавить новую статью
 @app.post("/articles/", response_model=schemas.ArticleResponse)
 def create_article(article: schemas.ArticleCreate, db: Session = Depends(get_db)):
@@ -87,6 +111,32 @@ def create_article(article: schemas.ArticleCreate, db: Session = Depends(get_db)
 def get_articles(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     articles = db.query(models.Article).offset(skip).limit(limit).all()
     return articles
+
+# Эндпоинт: Обновить статью
+@app.put("/articles/{article_id}", response_model=schemas.ArticleResponse)
+def update_article(article_id: int, article: schemas.ArticleCreate, db: Session = Depends(get_db)):
+    db_article = db.query(models.Article).filter(models.Article.id == article_id).first()
+    if not db_article:
+        raise HTTPException(status_code=404, detail="Статья не найдена")
+    
+    # Обновляем все переданные поля
+    for key, value in article.dict().items():
+        setattr(db_article, key, value)
+        
+    db.commit()
+    db.refresh(db_article)
+    return db_article
+
+# Эндпоинт: Удалить статью
+@app.delete("/articles/{article_id}")
+def delete_article(article_id: int, db: Session = Depends(get_db)):
+    db_article = db.query(models.Article).filter(models.Article.id == article_id).first()
+    if not db_article:
+        raise HTTPException(status_code=404, detail="Статья не найдена")
+    
+    db.delete(db_article)
+    db.commit()
+    return {"message": "Статья успешно удалена"}
 
 # Эндпоинт: Создать новый тег
 @app.post("/tags/", response_model=schemas.TagResponse)
@@ -130,6 +180,30 @@ def create_note(article_id: int, note: schemas.NoteCreate, db: Session = Depends
 def get_notes(article_id: int, db: Session = Depends(get_db)):
     return db.query(models.Note).filter(models.Note.article_id == article_id).all()
 
+# Эндпоинт: Обновить заметку
+@app.put("/notes/{note_id}", response_model=schemas.NoteResponse)
+def update_note(note_id: int, note: schemas.NoteCreate, db: Session = Depends(get_db)):
+    db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
+    if not db_note:
+        raise HTTPException(status_code=404, detail="Заметка не найдена")
+    
+    db_note.field_type = note.field_type
+    db_note.content = note.content
+    db.commit()
+    db.refresh(db_note)
+    return db_note
+
+# Эндпоинт: Удалить заметку
+@app.delete("/notes/{note_id}")
+def delete_note(note_id: int, db: Session = Depends(get_db)):
+    db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
+    if not db_note:
+        raise HTTPException(status_code=404, detail="Заметка не найдена")
+    
+    db.delete(db_note)
+    db.commit()
+    return {"message": "Заметка успешно удалена"}
+
 # Эндпоинт: Поиск статей
 @app.get("/search/")
 def search_articles(query: str, db: Session = Depends(get_db)):
@@ -170,3 +244,71 @@ async def upload_article(file: UploadFile = File(...)):
     
     # Здесь можно вызвать функцию extract_text_from_pdf(file_path)
     return {"filename": file.filename, "path": file_path}
+
+# Эндпоинт: Создать автора в справочнике
+@app.post("/authors/", response_model=schemas.AuthorResponse)
+def create_author(author: schemas.AuthorBase, db: Session = Depends(get_db)):
+    db_author = models.Author(last_name=author.last_name, initials=author.initials)
+    db.add(db_author)
+    db.commit()
+    db.refresh(db_author)
+    return db_author
+
+# Эндпоинт: Получить список всех авторов
+@app.get("/authors/", response_model=list[schemas.AuthorResponse])
+def get_authors(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return db.query(models.Author).offset(skip).limit(limit).all()
+
+# --- ЭНДПОИНТЫ ДЛЯ ЦИТАТ (Quotes) ---
+
+# Эндпоинт: Сохранить новую цитату из статьи
+@app.post("/quotes/", response_model=schemas.QuoteResponse)
+def create_quote(quote: schemas.QuoteCreate, db: Session = Depends(get_db)):
+    db_quote = models.Quote(**quote.dict())
+    db.add(db_quote)
+    db.commit()
+    db.refresh(db_quote)
+    return db_quote
+
+# Эндпоинт: Получить все цитаты для конкретной статьи
+@app.get("/articles/{article_id}/quotes/", response_model=list[schemas.QuoteResponse])
+def get_quotes_by_article(article_id: int, db: Session = Depends(get_db)):
+    return db.query(models.Quote).filter(models.Quote.article_id == article_id).all()
+
+# Эндпоинт: Удалить цитату
+@app.delete("/quotes/{quote_id}")
+def delete_quote(quote_id: int, db: Session = Depends(get_db)):
+    db_quote = db.query(models.Quote).filter(models.Quote.id == quote_id).first()
+    if not db_quote:
+        raise HTTPException(status_code=404, detail="Цитата не найдена")
+    
+    db.delete(db_quote)
+    db.commit()
+    return {"message": "Цитата успешно удалена"}
+
+# --- ЭНДПОИНТЫ ДЛЯ ЦИТИРОВАНИЯ В ДРАФТЕ (Draft Citations) ---
+
+# Эндпоинт: Привязать статью к маркеру в драфте
+@app.post("/draft-citations/", response_model=schemas.DraftCitationResponse)
+def create_draft_citation(citation: schemas.DraftCitationCreate, db: Session = Depends(get_db)):
+    db_citation = models.DraftCitation(**citation.dict())
+    db.add(db_citation)
+    db.commit()
+    db.refresh(db_citation)
+    return db_citation
+
+# Эндпоинт: Получить все привязанные статьи для конкретного драфта
+@app.get("/drafts/{draft_id}/citations/", response_model=list[schemas.DraftCitationResponse])
+def get_citations_by_draft(draft_id: int, db: Session = Depends(get_db)):
+    return db.query(models.DraftCitation).filter(models.DraftCitation.draft_id == draft_id).all()
+
+# Эндпоинт: Удалить привязку (если маркер удален из текста)
+@app.delete("/draft-citations/{citation_id}")
+def delete_draft_citation(citation_id: int, db: Session = Depends(get_db)):
+    db_citation = db.query(models.DraftCitation).filter(models.DraftCitation.id == citation_id).first()
+    if not db_citation:
+        raise HTTPException(status_code=404, detail="Связь не найдена")
+    
+    db.delete(db_citation)
+    db.commit()
+    return {"message": "Внутритекстовая ссылка успешно удалена"}

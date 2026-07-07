@@ -90,3 +90,19 @@ class Draft(Base):
     project_id = Column(Integer, ForeignKey("projects.id"))
     title = Column(String, nullable=False)
     content = Column(Text, nullable=True) # Здесь будет ваш Markdown-текст
+
+class Quote(Base):
+    __tablename__ = "quotes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    article_id = Column(Integer, ForeignKey("articles.id"))
+    highlighted_text = Column(Text, nullable=False)
+    page_number = Column(Integer, nullable=True)
+
+class DraftCitation(Base):
+    __tablename__ = "draft_citations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    draft_id = Column(Integer, ForeignKey("drafts.id"))
+    article_id = Column(Integer, ForeignKey("articles.id"))
+    in_text_marker = Column(String, nullable=False)

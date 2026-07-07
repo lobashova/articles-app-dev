@@ -81,3 +81,34 @@ class AuthorResponse(AuthorBase):
 
     class Config:
         from_attributes = True
+
+# --- ЦИТАТЫ (Quotes) ---
+class QuoteBase(BaseModel):
+    highlighted_text: str
+    page_number: Optional[int] = None
+
+class QuoteCreate(QuoteBase):
+    article_id: int
+
+class QuoteResponse(QuoteBase):
+    id: int
+    article_id: int
+
+    class Config:
+        from_attributes = True
+
+# --- ЦИТИРОВАНИЕ В ДРАФТЕ (Draft Citations) ---
+class DraftCitationBase(BaseModel):
+    in_text_marker: str
+
+class DraftCitationCreate(DraftCitationBase):
+    draft_id: int
+    article_id: int
+
+class DraftCitationResponse(DraftCitationBase):
+    id: int
+    draft_id: int
+    article_id: int
+
+    class Config:
+        from_attributes = True
