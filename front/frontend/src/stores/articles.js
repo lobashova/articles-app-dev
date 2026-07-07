@@ -7,7 +7,6 @@ export const useArticlesStore = defineStore('articles', {
     isLoading: false,
   }),
   actions: {
-    // Получение всех статей с сервера
     async fetchArticles() {
       this.isLoading = true;
       try {
@@ -19,7 +18,17 @@ export const useArticlesStore = defineStore('articles', {
         this.isLoading = false;
       }
     },
-    // Удаление статьи
+    // --- НОВОЕ ДЕЙСТВИЕ: Создание статьи ---
+    async addArticle(articleData) {
+      try {
+        const response = await api.post('/articles/', articleData);
+        this.list.unshift(response.data); // Добавляем новую статью в начало списка
+        return response.data;
+      } catch (error) {
+        console.error('Ошибка при сохранении статьи:', error);
+        throw error;
+      }
+    },
     async deleteArticle(articleId) {
       try {
         await api.delete(`/articles/${articleId}`);
