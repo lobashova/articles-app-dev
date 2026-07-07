@@ -2,7 +2,12 @@
   <div class="app-layout">
     <header class="top-bar">
       <div class="logo">📚 Приложение для статей</div>
-      
+      <button 
+          @click="tabsStore.openTab({ id: 'library', title: '🗄️ База статей', componentName: 'ArticleList' })"
+          style="background: transparent; color: white; border: 1px solid white; padding: 5px 15px; border-radius: 4px; cursor: pointer;"
+        >
+          Открыть библиотеку
+        </button>
       <div class="search-container">
         <input type="text" placeholder="Умный поиск по базе..." class="global-search" />
       </div>
@@ -43,13 +48,15 @@ import { computed } from 'vue';
 import { useTabsStore } from './stores/tabs';
 import ProjectList from './components/ProjectList.vue';
 import DraftEditor from './components/DraftEditor.vue'; // 1. Проверьте наличие импорта!
+import ArticleList from './components/ArticleList.vue';
 
 const tabsStore = useTabsStore();
 
 // Карта доступных компонентов
 const componentsMap = {
   ProjectList,
-  DraftEditor // 2. Проверьте, что DraftEditor добавлен сюда без кавычек!
+  DraftEditor,
+  ArticleList
 };
 
 const activeComponent = computed(() => {
