@@ -58,6 +58,23 @@
             rows="4"
           ></textarea>
         </div>
+
+        <div class="note-group">
+            <label>🏷 Теги</label>
+            <div class="tags-list">
+                <span v-for="tag in articleTags" :key="tag.id" class="tag-badge">
+                {{ tag.name }}
+                </span>
+            </div>
+            <div class="form-row">
+                <select v-model="selectedTag" @change="addTagToArticle(selectedTag)" class="half">
+                <option :value="null">-- Добавить существующий тег --</option>
+                <option v-for="t in tagsStore.list" :key="t.id" :value="t">{{ t.name }}</option>
+                </select>
+                <input v-model="newTagName" placeholder="Новый тег..." class="quarter" />
+                <button @click="createAndAddTag" class="add-tag-btn">+</button>
+            </div>
+        </div>
         
         </div>
     </div>
@@ -69,6 +86,12 @@ import { ref, onMounted } from 'vue';
 import api from '../api';
 import { useTabsStore } from '../stores/tabs';
 import { useArticlesStore } from '../stores/articles';
+
+import { useTagsStore } from '../stores/tags';
+
+const tagsStore = useTagsStore();
+const newTagName = ref('');
+const articleTags = ref([]); // Теги, привязанные к этой статье
 
 const tabsStore = useTabsStore();
 const articlesStore = useArticlesStore();
@@ -119,7 +142,24 @@ onMounted(async () => {
       console.error("Ошибка при загрузке заметок", error);
     }
   }
+  tagsStore.fetchTags();
 });
+
+const addTagToArticle = async (tag) => {
+  try {
+    await api.post(`/articles/${articleId.value}/tags/${tag.id}`);
+    articleTags.value.push(tag);
+  } catch (error) {
+    alert("Не удалось привязать тег");
+  }
+};
+
+const createAndAddTag = async () => {
+  if (!newTagName.value) return;
+  const tag = await tagsStore.createTag(newTagName.value);
+  await addTagToArticle(tag);
+  newTagName.value = '';
+};
 
 const saveNotes = async () => {
   isSaving.value = true;
@@ -242,5 +282,23 @@ const saveNotes = async () => {
   outline: none;
   border-color: #3498db;
   background: #fff;
+}
+
+.tag-badge {
+  display: inline-block;
+  background: #3498db;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-right: 5px;
+  font-size: 0.85em;
+}
+.add-tag-btn {
+  background: #34495e;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
 }
 </style>
