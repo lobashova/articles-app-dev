@@ -329,26 +329,58 @@ const saveNotes = async () => {
 
       <div class="notes-container">
         <div class="note-group">
-          <label>🏷 Теги</label>
-          <div class="tags-list" style="margin-bottom: 10px;">
-            <span v-for="tag in articleTags" :key="tag.id" class="tag-badge">
-              {{ tag.name }}
-            </span>
-          </div>
-          <div class="form-row">
-            <select v-model="selectedTag" @change="addTagToArticle(selectedTag)" class="half">
-              <option :value="null">-- Добавить тег --</option>
-              <option v-for="t in tagsStore.list" :key="t.id" :value="t">{{ t.name }}</option>
-            </select>
-            <input v-model="newTagName" placeholder="Новый тег..." class="quarter" />
-            <button @click="createAndAddTag" class="add-tag-btn">+</button>
-          </div>
+          <label>🎯 Цели исследования (Aims)</label>
+          <textarea 
+            v-model="notes.aims" 
+            placeholder="Какую проблему решает автор?..."
+            rows="3"
+          ></textarea>
         </div>
 
         <div class="note-group">
-          <label>🎯 Цели исследования (Aims)</label>
-          <textarea v-model="notes.aims" rows="3"></textarea>
+          <label>🛠 Методы (Methods)</label>
+          <textarea 
+            v-model="notes.methods" 
+            placeholder="Какие данные и алгоритмы использовались?..."
+            rows="4"
+          ></textarea>
         </div>
+
+        <div class="note-group">
+          <label>📊 Главные результаты (Results)</label>
+          <textarea 
+            v-model="notes.results" 
+            placeholder="Ключевые выводы, цифры, инсайты..."
+            rows="5"
+          ></textarea>
+        </div>
+
+        <div class="note-group">
+          <label>💡 Мои комментарии и идеи</label>
+          <textarea 
+            v-model="notes.comments" 
+            placeholder="Как это можно применить в моем проекте? С чем я не согласна?..."
+            rows="4"
+          ></textarea>
+        </div>
+
+        <div class="note-group">
+            <label>🏷 Теги</label>
+            <div class="tags-list">
+                <span v-for="tag in articleTags" :key="tag.id" class="tag-badge">
+                {{ tag.name }}
+                </span>
+            </div>
+            <div class="form-row">
+                <select v-model="selectedTag" @change="addTagToArticle(selectedTag)" class="half">
+                <option :value="null">-- Добавить существующий тег --</option>
+                <option v-for="t in tagsStore.list" :key="t.id" :value="t">{{ t.name }}</option>
+                </select>
+                <input v-model="newTagName" placeholder="Новый тег..." class="quarter" />
+                <button @click="createAndAddTag" class="add-tag-btn">+</button>
+            </div>
+        </div>
+        
         </div>
     </div>
   </div>
