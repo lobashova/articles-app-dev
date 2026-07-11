@@ -365,20 +365,20 @@ const saveNotes = async () => {
         </div>
 
         <div class="note-group">
-            <label>🏷 Теги</label>
-            <div class="tags-list">
-                <span v-for="tag in articleTags" :key="tag.id" class="tag-badge">
-                {{ tag.name }}
-                </span>
-            </div>
-            <div class="form-row">
-                <select v-model="selectedTag" @change="addTagToArticle(selectedTag)" class="half">
-                <option :value="null">-- Добавить существующий тег --</option>
-                <option v-for="t in tagsStore.list" :key="t.id" :value="t">{{ t.name }}</option>
-                </select>
-                <input v-model="newTagName" placeholder="Новый тег..." class="quarter" />
-                <button @click="createAndAddTag" class="add-tag-btn">+</button>
-            </div>
+          <label>🏷 Теги</label>
+          <div class="tags-list" style="margin-bottom: 10px;">
+            <span v-for="tag in articleTags" :key="tag.id" class="tag-badge">
+              {{ tag.name }}
+            </span>
+          </div>
+          <div class="form-row">
+            <select v-model="selectedTag" @change="addTagToArticle(selectedTag)" class="half">
+              <option :value="null">-- Добавить тег --</option>
+              <option v-for="t in tagsStore.list" :key="t.id" :value="t">{{ t.name }}</option>
+            </select>
+            <input v-model="newTagName" placeholder="Новый тег..." class="quarter" />
+            <button @click="createAndAddTag" class="add-tag-btn">+</button>
+          </div>
         </div>
         
         </div>
