@@ -18,11 +18,30 @@ export const useArticlesStore = defineStore('articles', {
         this.isLoading = false;
       }
     },
-    // --- НОВОЕ ДЕЙСТВИЕ: Создание статьи ---
+    
+    // --- НОВОЕ ДЕЙСТВИЕ: Загрузка PDF-файла ---
+    async uploadFile(file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      try {
+        // При загрузке файлов обязательно нужно менять Content-Type
+        const response = await api.post('/upload-article/', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data' 
+          }
+        });
+        return response.data; // Сервер вернет { filename: '...', path: '...' }
+      } catch (error) {
+        console.error('Ошибка при загрузке PDF:', error);
+        throw error;
+      }
+    },
+
     async addArticle(articleData) {
       try {
         const response = await api.post('/articles/', articleData);
-        this.list.unshift(response.data); // Добавляем новую статью в начало списка
+        this.list.unshift(response.data);
         return response.data;
       } catch (error) {
         console.error('Ошибка при сохранении статьи:', error);

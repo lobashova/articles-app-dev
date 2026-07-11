@@ -18,7 +18,7 @@
         <form @submit.prevent="submitArticle" class="meta-form">
           <div class="form-group">
             <label>Файл статьи (PDF):</label>
-            <input type="file" accept=".pdf" />
+            <input type="file" accept=".pdf" @change="handleFileUpload" />
           </div>
 
           <div class="form-row">
@@ -132,6 +132,7 @@ import { useArticlesStore } from '../stores/articles';
 
 const articlesStore = useArticlesStore();
 const showUploadModal = ref(false);
+const selectedFile = ref(null); // Ссылка на выбранный файл
 
 // Базовое состояние новой статьи
 const defaultArticleState = {
@@ -144,22 +145,37 @@ const defaultArticleState = {
   pages: '',
   doi: '',
   web_link: '',
-  abstract: ''
+  abstract: '',
+  pdf_path: '' // Добавили поле для пути к файлу
 };
 
 const newArticle = ref({ ...defaultArticleState });
 
+// --- НОВАЯ ФУНКЦИЯ: Захват файла при выборе ---
+const handleFileUpload = (event) => {
+  selectedFile.value = event.target.files[0];
+};
+
 const closeModal = () => {
   showUploadModal.value = false;
   newArticle.value = { ...defaultArticleState }; // Сброс формы
+  selectedFile.value = null; // Сброс выбранного файла
 };
 
+// --- ОБНОВЛЕННАЯ ФУНКЦИЯ: Двухэтапное сохранение ---
 const submitArticle = async () => {
   try {
+    // Этап 1: Если файл выбран, сначала загружаем его
+    if (selectedFile.value) {
+      const uploadResult = await articlesStore.uploadFile(selectedFile.value);
+      newArticle.value.pdf_path = uploadResult.path; // Прикрепляем путь к метаданным
+    }
+    
+    // Этап 2: Сохраняем статью в БД (уже с заполненным pdf_path)
     await articlesStore.addArticle(newArticle.value);
     closeModal();
   } catch (error) {
-    alert('Ошибка при сохранении статьи. Проверьте консоль.');
+    alert('Ошибка при сохранении статьи или загрузке файла. Проверьте консоль.');
   }
 };
 
