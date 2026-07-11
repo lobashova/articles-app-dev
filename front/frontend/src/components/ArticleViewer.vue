@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div class="viewer-wrapper">
     <div class="pdf-pane">
       <div v-if="pdfPath" class="pdf-container">
@@ -301,4 +301,269 @@ const saveNotes = async () => {
   border-radius: 4px;
   cursor: pointer;
 }
-</style>
+</style> -->
+
+<template>
+  <div class="viewer-wrapper">
+    <div class="pdf-pane">
+      <div v-if="pdfPath" class="pdf-container">
+        <iframe 
+          :src="`https://articles-app.ru/${pdfPath}`" 
+          width="100%" 
+          height="100%" 
+          frameborder="0"
+        ></iframe>
+      </div>
+      <div v-else class="empty-pdf">
+        <p>У этой статьи пока нет загруженного PDF-файла.</p>
+      </div>
+    </div>
+
+    <div class="info-pane">
+      <div class="info-header">
+        <h3>📝 Анализ статьи</h3>
+        <button @click="saveNotes" class="save-btn" :disabled="isSaving">
+          {{ isSaving ? '⏳ Сохранение...' : '💾 Сохранить' }}
+        </button>
+      </div>
+
+      <div class="notes-container">
+        <div class="note-group">
+          <label>🏷 Теги</label>
+          <div class="tags-list" style="margin-bottom: 10px;">
+            <span v-for="tag in articleTags" :key="tag.id" class="tag-badge">
+              {{ tag.name }}
+            </span>
+          </div>
+          <div class="form-row">
+            <select v-model="selectedTag" @change="addTagToArticle(selectedTag)" class="half">
+              <option :value="null">-- Добавить тег --</option>
+              <option v-for="t in tagsStore.list" :key="t.id" :value="t">{{ t.name }}</option>
+            </select>
+            <input v-model="newTagName" placeholder="Новый тег..." class="quarter" />
+            <button @click="createAndAddTag" class="add-tag-btn">+</button>
+          </div>
+        </div>
+
+        <div class="note-group">
+          <label>🎯 Цели исследования (Aims)</label>
+          <textarea v-model="notes.aims" rows="3"></textarea>
+        </div>
+        </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, watch } from 'vue'; // Добавили watch
+import api from '../api';
+import { useTabsStore } from '../stores/tabs';
+import { useArticlesStore } from '../stores/articles';
+import { useTagsStore } from '../stores/tags';
+
+const tabsStore = useTabsStore();
+const articlesStore = useArticlesStore();
+const tagsStore = useTagsStore();
+
+const articleId = ref(null);
+const pdfPath = ref('');
+const isSaving = ref(false);
+const selectedTag = ref(null); // ОБЪЯВИЛИ ПЕРЕМЕННУЮ
+const newTagName = ref('');
+const articleTags = ref([]);
+
+const notes = ref({ aims: '', methods: '', results: '', comments: '' });
+const noteIds = ref({ aims: null, methods: null, results: null, comments: null });
+
+// Функция загрузки данных статьи
+const loadArticleData = async () => {
+  const activeTabId = tabsStore.activeTabId;
+  if (!activeTabId || !activeTabId.startsWith('viewer-')) return;
+  
+  articleId.value = parseInt(activeTabId.split('-')[1]);
+  
+  // 1. Ищем PDF путь (с учетом того, что список статей мог еще не загрузиться)
+  const article = articlesStore.list.find(a => a.id === articleId.value);
+  if (article) {
+    pdfPath.value = article.pdf_path;
+  }
+
+  // 2. Загружаем заметки
+  try {
+    const response = await api.get(`/articles/${articleId.value}/notes/`);
+    response.data.forEach(note => {
+      if (notes.value[note.field_type] !== undefined) {
+        notes.value[note.field_type] = note.content;
+        noteIds.value[note.field_type] = note.id;
+      }
+    });
+  } catch (e) { console.error(e); }
+};
+
+// --- НАБЛЮДАТЕЛЬ (WATCH) ---
+// Если список статей загрузился позже, чем открылся вьювер — обновим PDF путь
+watch(() => articlesStore.list, () => {
+  if (!pdfPath.value) loadArticleData();
+}, { deep: true });
+
+onMounted(async () => {
+  await loadArticleData();
+  tagsStore.fetchTags();
+});
+
+const addTagToArticle = async (tag) => {
+  try {
+    await api.post(`/articles/${articleId.value}/tags/${tag.id}`);
+    articleTags.value.push(tag);
+  } catch (error) {
+    alert("Не удалось привязать тег");
+  }
+};
+
+const createAndAddTag = async () => {
+  if (!newTagName.value) return;
+  const tag = await tagsStore.createTag(newTagName.value);
+  await addTagToArticle(tag);
+  newTagName.value = '';
+};
+
+const saveNotes = async () => {
+  isSaving.value = true;
+  try {
+    // Проходим по каждому полю (aims, methods, results, comments)
+    for (const field of Object.keys(notes.value)) {
+      const content = notes.value[field];
+      const id = noteIds.value[field];
+
+      if (id) {
+        // Если заметка уже была в базе — обновляем её (PUT)
+        await api.put(`/notes/${id}`, { field_type: field, content: content });
+      } else if (content.trim() !== '') {
+        // Если заметки не было, но текст появился — создаем новую (POST)
+        const res = await api.post(`/articles/${articleId.value}/notes/`, { 
+          field_type: field, 
+          content: content 
+        });
+        noteIds.value[field] = res.data.id; // Запоминаем новый ID
+      }
+    }
+  } catch (error) {
+    alert("Ошибка при сохранении заметок!");
+  } finally {
+    isSaving.value = false;
+  }
+};
+</script>
+<style scoped>
+.viewer-wrapper {
+  display: flex;
+  height: calc(100vh - 120px);
+  margin: -20px;
+  background: #ecf0f1;
+}
+
+/* Левая часть - PDF */
+.pdf-pane {
+  flex: 1;
+  border-right: 2px solid #bdc3c7;
+  display: flex;
+  flex-direction: column;
+}
+.pdf-container {
+  flex-grow: 1;
+  width: 100%;
+}
+.empty-pdf {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #7f8c8d;
+  font-size: 1.2em;
+}
+
+/* Правая часть - Рабочая тетрадь */
+.info-pane {
+  width: 450px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -2px 0 10px rgba(0,0,0,0.05);
+}
+
+.info-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fdfdfd;
+}
+.info-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.2em;
+}
+
+.save-btn {
+  background: #2ecc71;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+.save-btn:hover { background: #27ae60; }
+.save-btn:disabled { background: #95a5a6; cursor: not-allowed; }
+
+.notes-container {
+  padding: 20px;
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.note-group {
+  margin-bottom: 20px;
+}
+.note-group label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #34495e;
+}
+.note-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+  font-family: inherit;
+  resize: vertical;
+  background: #fafafa;
+}
+.note-group textarea:focus {
+  outline: none;
+  border-color: #3498db;
+  background: #fff;
+}
+
+.tag-badge {
+  display: inline-block;
+  background: #3498db;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-right: 5px;
+  font-size: 0.85em;
+}
+.add-tag-btn {
+  background: #34495e;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+</style> 
