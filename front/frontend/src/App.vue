@@ -49,6 +49,7 @@ import { useTabsStore } from './stores/tabs';
 import ProjectList from './components/ProjectList.vue';
 import DraftEditor from './components/DraftEditor.vue'; // 1. Проверьте наличие импорта!
 import ArticleList from './components/ArticleList.vue';
+import ArticleViewer from './components/ArticleViewer.vue';
 
 const tabsStore = useTabsStore();
 
@@ -56,7 +57,8 @@ const tabsStore = useTabsStore();
 const componentsMap = {
   ProjectList,
   DraftEditor,
-  ArticleList
+  ArticleList,
+  ArticleViewer
 };
 
 const activeComponent = computed(() => {

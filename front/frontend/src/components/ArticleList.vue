@@ -145,7 +145,7 @@
         
         <div style="display: flex; gap: 8px;">
           <button 
-            @click="openArticleFile(article.pdf_path)"
+            @click="openArticleFile(article)"
             :disabled="!article.pdf_path"
             :style="{ background: article.pdf_path ? '#3498db' : '#95a5a6' }"
             style="padding: 6px 12px; color: white; border: none; border-radius: 4px; cursor: pointer;"
@@ -167,6 +167,9 @@ import { ref, onMounted } from 'vue';
 import api from '../api'; // Добавили импорт API для прямых запросов
 import { useArticlesStore } from '../stores/articles';
 import { useAuthorsStore } from '../stores/authors'; // Подключили хранилище авторов
+import { useTabsStore } from '../stores/tabs'; // Убедитесь, что импорт есть
+
+const tabsStore = useTabsStore();
 
 const articlesStore = useArticlesStore();
 const authorsStore = useAuthorsStore();
@@ -292,10 +295,12 @@ const submitArticle = async () => {
   }
 };
 
-const openArticleFile = (pdfPath) => {
-  if (!pdfPath) return;
-  const fileUrl = `https://articles-app.ru/${pdfPath}`;
-  window.open(fileUrl, '_blank');
+const openArticleFile = (article) => {
+  tabsStore.openTab({
+    id: 'viewer-' + article.id,
+    title: '📖 ' + article.title.substring(0, 15) + '...', // Короткий заголовок для вкладки
+    componentName: 'ArticleViewer'
+  });
 };
 
 onMounted(() => {
