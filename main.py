@@ -1,6 +1,7 @@
 import logging
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import models, schemas
@@ -27,6 +28,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Article Management API")
+
+app.mount("/uploaded_files", StaticFiles(directory="uploaded_files"), name="uploaded_files")
 
 origins = [
     "http://localhost:5173",  # Адрес, где работает ваш Vue.js при разработке

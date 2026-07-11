@@ -3,7 +3,7 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h2>📚 База статей</h2>
       <button 
-        @click="showUploadModal = true"
+        @click="openCreateModal"
         style="padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;"
       >
         + Добавить статью
@@ -12,11 +12,10 @@
 
     <div v-if="showUploadModal" class="modal-overlay">
       <div class="modal-content">
-        <h3 style="margin-top: 0;">Добавление нового источника</h3>
-        <p style="color: #777; font-size: 0.9em; margin-bottom: 20px;">Заполните метаданные. Поля со звездочкой обязательны.</p>
+        <h3 style="margin-top: 0;">{{ isEditMode ? 'Редактирование метаданных' : 'Добавление нового источника' }}</h3>
         
         <form @submit.prevent="submitArticle" class="meta-form">
-          <div class="form-group">
+          <div v-if="!isEditMode" class="form-group">
             <label>Файл статьи (PDF):</label>
             <input type="file" accept=".pdf" @change="handleFileUpload" />
             <div v-if="isUploading" style="color: #2980b9; font-size: 0.9em; margin-top: 5px;">
@@ -86,7 +85,7 @@
           </div>
 
           <div class="modal-actions">
-            <button type="submit" class="save-btn">Сохранить статью</button>
+            <button type="submit" class="save-btn">Сохранить</button>
             <button type="button" @click="closeModal" class="cancel-btn">Отмена</button>
           </div>
         </form>
@@ -109,10 +108,23 @@
           </p>
         </div>
         
-        <div>
-          <button style="padding: 6px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
-            Открыть статью
+        <div style="display: flex; gap: 8px;">
+          <button 
+            @click="openArticleFile(article.pdf_path)"
+            :disabled="!article.pdf_path"
+            :style="{ background: article.pdf_path ? '#3498db' : '#95a5a6' }"
+            style="padding: 6px 12px; color: white; border: none; border-radius: 4px; cursor: pointer;"
+          >
+            {{ article.pdf_path ? 'Открыть PDF' : 'Нет файла' }}
           </button>
+          
+          <button 
+            @click="openEditModal(article)"
+            style="padding: 6px 12px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer;"
+          >
+            Изменить
+          </button>
+          
           <button 
             @click="articlesStore.deleteArticle(article.id)"
             style="padding: 6px 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;"
@@ -135,48 +147,12 @@ import { useArticlesStore } from '../stores/articles';
 
 const articlesStore = useArticlesStore();
 const showUploadModal = ref(false);
-const selectedFile = ref(null); // Ссылка на выбранный файл
-// Добавьте это свойство рядом с const showUploadModal = ref(false);
 const isUploading = ref(false);
 
-// --- НОВЫЙ ПОДХОД: Загружаем файл и парсим метаданные сразу при выборе ---
-const handleFileUpload = async (event) => {
-  const file = event.target.files[0];
-  if (!file) return;
-  
-  isUploading.value = true;
-  try {
-    const uploadResult = await articlesStore.uploadFile(file);
-    newArticle.value.pdf_path = uploadResult.path; // Сохраняем путь
-    
-    // Если сервер нашел DOI и вытащил данные из Crossref — предзаполняем форму
-    if (uploadResult.extracted_metadata) {
-      const meta = uploadResult.extracted_metadata;
-      if (meta.title) newArticle.value.title = meta.title;
-      if (meta.year) newArticle.value.year = meta.year;
-      if (meta.journal) newArticle.value.journal = meta.journal;
-      if (meta.doi) newArticle.value.doi = meta.doi;
-      
-      alert("✨ Метаданные успешно извлечены из PDF!");
-    }
-  } catch (error) {
-    alert("Ошибка при загрузке или анализе файла.");
-  } finally {
-    isUploading.value = false;
-  }
-};
+// Флаги для режима редактирования
+const isEditMode = ref(false);
+const editingArticleId = ref(null);
 
-// --- УПРОЩЕННОЕ СОХРАНЕНИЕ (Файл уже на сервере) ---
-const submitArticle = async () => {
-  try {
-    await articlesStore.addArticle(newArticle.value);
-    closeModal();
-  } catch (error) {
-    alert('Ошибка при сохранении статьи. Проверьте консоль.');
-  }
-};
-
-// Базовое состояние новой статьи
 const defaultArticleState = {
   type: 'Journal Article',
   title: '',
@@ -188,16 +164,82 @@ const defaultArticleState = {
   doi: '',
   web_link: '',
   abstract: '',
-  pdf_path: '' // Добавили поле для пути к файлу
+  pdf_path: ''
 };
 
 const newArticle = ref({ ...defaultArticleState });
+const selectedFile = ref(null);
 
+// Открытие для создания
+const openCreateModal = () => {
+  isEditMode.value = false;
+  editingArticleId.value = null;
+  newArticle.value = { ...defaultArticleState };
+  showUploadModal.value = true;
+};
+
+// Открытие для редактирования
+const openEditModal = (article) => {
+  isEditMode.value = true;
+  editingArticleId.value = article.id;
+  // Копируем текущие данные статьи в форму
+  newArticle.value = { ...article };
+  showUploadModal.value = true;
+};
 
 const closeModal = () => {
   showUploadModal.value = false;
-  newArticle.value = { ...defaultArticleState }; // Сброс формы
-  selectedFile.value = null; // Сброс выбранного файла
+  newArticle.value = { ...defaultArticleState };
+  selectedFile.value = null;
+  isEditMode.value = false;
+  editingArticleId.value = null;
+};
+
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  isUploading.value = true;
+  try {
+    const uploadResult = await articlesStore.uploadFile(file);
+    newArticle.value.pdf_path = uploadResult.path;
+    
+    if (uploadResult.extracted_metadata) {
+      const meta = uploadResult.extracted_metadata;
+      if (meta.title) newArticle.value.title = meta.title;
+      if (meta.year) newArticle.value.year = meta.year;
+      if (meta.journal) newArticle.value.journal = meta.journal;
+      if (meta.doi) newArticle.value.doi = meta.doi;
+      alert("✨ Метаданные успешно извлечены из PDF!");
+    }
+  } catch (error) {
+    alert("Ошибка при загрузке или анализе файла.");
+  } finally {
+    isUploading.value = false;
+  }
+};
+
+const submitArticle = async () => {
+  try {
+    if (isEditMode.value) {
+      // Если мы редактируем — вызываем PUT эндпоинт
+      await articlesStore.updateArticle(editingArticleId.value, newArticle.value);
+    } else {
+      // Если создаем новую — вызывем POST эндпоинт
+      await articlesStore.addArticle(newArticle.value);
+    }
+    closeModal();
+  } catch (error) {
+    alert('Ошибка при сохранении изменений.');
+  }
+};
+
+// Функция открытия PDF файла в новой вкладке браузера
+const openArticleFile = (pdfPath) => {
+  if (!pdfPath) return;
+  // Формируем прямую ссылку на примонтированную бэкендом папку
+  const fileUrl = `https://articles-app.ru/${pdfPath}`;
+  window.open(fileUrl, '_blank');
 };
 
 onMounted(() => {
@@ -206,92 +248,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Стили для модального окна и формы */
+/* Стили остаются прежними */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0; width: 100%; height: 100%;
   background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
+  display: flex; justify-content: center; align-items: center; z-index: 1000;
 }
-
 .modal-content {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  width: 600px;
-  max-width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
+  background: white; padding: 30px; border-radius: 10px;
+  width: 600px; max-width: 90%; max-height: 90vh; overflow-y: auto;
   box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
-
-.form-group {
-  margin-bottom: 15px;
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; color: #333; }
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;
 }
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-  font-size: 0.9em;
-  color: #333;
-}
-.form-group input, 
-.form-group select, 
-.form-group textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  box-sizing: border-box;
-  font-family: inherit;
-}
-
-.form-row {
-  display: flex;
-  gap: 15px;
-}
+.form-row { display: flex; gap: 15px; }
 .half { flex: 1; }
 .quarter { flex: 0.5; }
-
-.dynamic-fields {
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 5px;
-  margin-bottom: 15px;
-  border-left: 3px solid #3498db;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.save-btn {
-  background: #2ecc71;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: bold;
-}
-.save-btn:hover { background: #27ae60; }
-
-.cancel-btn {
-  background: #e74c3c;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-}
-.cancel-btn:hover { background: #c0392b; }
+.dynamic-fields { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 3px solid #3498db; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+.save-btn { background: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+.cancel-btn { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
 </style>
