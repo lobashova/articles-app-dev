@@ -327,3 +327,37 @@ def delete_draft_citation(citation_id: int, db: Session = Depends(get_db)):
     db.delete(db_citation)
     db.commit()
     return {"message": "Внутритекстовая ссылка успешно удалена"}
+
+# --- ЭНДПОИНТЫ ДЛЯ СВЯЗИ АВТОРОВ И СТАТЕЙ ---
+
+# Эндпоинт: Синхронизация авторов статьи (сохраняет порядок)
+@app.post("/articles/{article_id}/sync-authors/")
+def sync_article_authors(article_id: int, data: schemas.AuthorSync, db: Session = Depends(get_db)):
+    # 1. Удаляем старые связи
+    db.query(models.ArticleAuthor).filter(models.ArticleAuthor.article_id == article_id).delete()
+    
+    # 2. Записываем новые с правильным порядком (index + 1)
+    for index, author_id in enumerate(data.author_ids):
+        new_link = models.ArticleAuthor(
+            article_id=article_id,
+            author_id=author_id,
+            order_index=index + 1
+        )
+        db.add(new_link)
+    db.commit()
+    return {"message": "Авторы успешно привязаны"}
+
+# Эндпоинт: Получить список авторов конкретной статьи
+@app.get("/articles/{article_id}/authors/")
+def get_article_authors(article_id: int, db: Session = Depends(get_db)):
+    links = db.query(models.ArticleAuthor).filter(models.ArticleAuthor.article_id == article_id).order_by(models.ArticleAuthor.order_index).all()
+    result = []
+    for link in links:
+        author = db.query(models.Author).filter(models.Author.id == link.author_id).first()
+        if author:
+            result.append({
+                "id": author.id,
+                "last_name": author.last_name,
+                "initials": author.initials
+            })
+    return result

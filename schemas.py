@@ -112,3 +112,6 @@ class DraftCitationResponse(DraftCitationBase):
 
     class Config:
         from_attributes = True
+
+class AuthorSync(BaseModel):
+    author_ids: list[int]

@@ -44,6 +44,42 @@
             <input v-model="newArticle.title" type="text" required placeholder="Введите полное название..." />
           </div>
 
+          <div class="dynamic-fields" style="border-left-color: #f39c12;">
+            <label style="font-weight: bold; margin-bottom: 10px; display: block;">👥 Авторы (в порядке цитирования)</label>
+            
+            <ul v-if="newArticle.authors.length > 0" style="padding-left: 20px; margin-bottom: 15px;">
+              <li v-for="(auth, index) in newArticle.authors" :key="index" style="margin-bottom: 5px;">
+                {{ auth.last_name }} {{ auth.initials }}
+                <button @click.prevent="newArticle.authors.splice(index, 1)" style="background: none; border: none; color: #e74c3c; cursor: pointer; font-weight: bold; margin-left: 10px;">❌</button>
+              </li>
+            </ul>
+            <div v-else style="color: #777; font-size: 0.9em; margin-bottom: 15px;">Авторы пока не добавлены.</div>
+            
+            <div class="form-row" style="align-items: end; margin-bottom: 10px;">
+              <div class="form-group half" style="margin-bottom: 0;">
+                <label style="font-weight: normal; font-size: 0.85em;">Выбрать из справочника</label>
+                <select v-model="selectedAuthor">
+                  <option :value="null">-- Выберите автора --</option>
+                  <option v-for="a in authorsStore.list" :key="a.id" :value="a">
+                    {{ a.last_name }} {{ a.initials }}
+                  </option>
+                </select>
+              </div>
+              <button @click.prevent="addExistingAuthor" style="padding: 8px 12px; background: #34495e; color: white; border: none; border-radius: 4px; cursor: pointer;">Добавить</button>
+            </div>
+            
+            <div class="form-row" style="align-items: end;">
+              <div class="form-group quarter" style="margin-bottom: 0;">
+                <label style="font-weight: normal; font-size: 0.85em;">Новый: Фамилия</label>
+                <input v-model="newAuthorForm.last_name" placeholder="напр. Smith" />
+              </div>
+              <div class="form-group quarter" style="margin-bottom: 0;">
+                <label style="font-weight: normal; font-size: 0.85em;">Инициалы</label>
+                <input v-model="newAuthorForm.initials" placeholder="J. D." />
+              </div>
+              <button @click.prevent="createNewAuthor" style="padding: 8px 12px; background: #34495e; color: white; border: none; border-radius: 4px; cursor: pointer;">Создать</button>
+            </div>
+          </div>
           <div v-if="newArticle.type === 'Journal Article'" class="dynamic-fields">
             <div class="form-row">
               <div class="form-group half">
@@ -93,7 +129,6 @@
     </div>
 
     <div v-if="articlesStore.isLoading">Загрузка базы...</div>
-    
     <ul v-else-if="articlesStore.list.length > 0" style="list-style: none; padding: 0;">
       <li 
         v-for="article in articlesStore.list" 
@@ -117,41 +152,33 @@
           >
             {{ article.pdf_path ? 'Открыть PDF' : 'Нет файла' }}
           </button>
-          
-          <button 
-            @click="openEditModal(article)"
-            style="padding: 6px 12px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer;"
-          >
-            Изменить
-          </button>
-          
-          <button 
-            @click="articlesStore.deleteArticle(article.id)"
-            style="padding: 6px 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;"
-          >
-            Удалить
-          </button>
+          <button @click="openEditModal(article)" style="padding: 6px 12px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer;">Изменить</button>
+          <button @click="articlesStore.deleteArticle(article.id)" style="padding: 6px 12px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">Удалить</button>
         </div>
       </li>
     </ul>
     
-    <div v-else class="empty-state">
-      В вашей базе пока нет статей. Загрузите первый источник!
-    </div>
+    <div v-else class="empty-state">В вашей базе пока нет статей. Загрузите первый источник!</div>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import api from '../api'; // Добавили импорт API для прямых запросов
 import { useArticlesStore } from '../stores/articles';
+import { useAuthorsStore } from '../stores/authors'; // Подключили хранилище авторов
 
 const articlesStore = useArticlesStore();
+const authorsStore = useAuthorsStore();
+
 const showUploadModal = ref(false);
 const isUploading = ref(false);
-
-// Флаги для режима редактирования
 const isEditMode = ref(false);
 const editingArticleId = ref(null);
+
+// Локальное состояние для управления авторами в форме
+const selectedAuthor = ref(null);
+const newAuthorForm = ref({ last_name: '', initials: '' });
 
 const defaultArticleState = {
   type: 'Journal Article',
@@ -164,33 +191,58 @@ const defaultArticleState = {
   doi: '',
   web_link: '',
   abstract: '',
-  pdf_path: ''
+  pdf_path: '',
+  authors: [] // Добавили массив авторов
 };
 
 const newArticle = ref({ ...defaultArticleState });
-const selectedFile = ref(null);
 
-// Открытие для создания
+// --- ЛОГИКА АВТОРОВ ---
+const addExistingAuthor = () => {
+  if (selectedAuthor.value && !newArticle.value.authors.find(a => a.id === selectedAuthor.value.id)) {
+    newArticle.value.authors.push(selectedAuthor.value);
+    selectedAuthor.value = null; // сбрасываем селект
+  }
+};
+
+const createNewAuthor = async () => {
+  if (newAuthorForm.value.last_name && newAuthorForm.value.initials) {
+    // 1. Сохраняем в глобальный справочник на сервере
+    const created = await authorsStore.createAuthor(newAuthorForm.value);
+    // 2. Сразу добавляем в локальный массив текущей статьи
+    newArticle.value.authors.push(created);
+    // 3. Очищаем инпуты
+    newAuthorForm.value.last_name = '';
+    newAuthorForm.value.initials = '';
+  }
+};
+// ----------------------
+
 const openCreateModal = () => {
   isEditMode.value = false;
   editingArticleId.value = null;
-  newArticle.value = { ...defaultArticleState };
+  newArticle.value = { ...defaultArticleState, authors: [] };
   showUploadModal.value = true;
 };
 
-// Открытие для редактирования
-const openEditModal = (article) => {
+const openEditModal = async (article) => {
   isEditMode.value = true;
   editingArticleId.value = article.id;
-  // Копируем текущие данные статьи в форму
-  newArticle.value = { ...article };
+  newArticle.value = { ...article, authors: [] };
   showUploadModal.value = true;
+  
+  // При открытии окна редактирования запрашиваем привязанных авторов с бэкенда
+  try {
+    const response = await api.get(`/articles/${article.id}/authors/`);
+    newArticle.value.authors = response.data;
+  } catch (error) {
+    console.error("Не удалось загрузить авторов", error);
+  }
 };
 
 const closeModal = () => {
   showUploadModal.value = false;
-  newArticle.value = { ...defaultArticleState };
-  selectedFile.value = null;
+  newArticle.value = { ...defaultArticleState, authors: [] };
   isEditMode.value = false;
   editingArticleId.value = null;
 };
@@ -221,29 +273,34 @@ const handleFileUpload = async (event) => {
 
 const submitArticle = async () => {
   try {
+    let savedArticle;
+    
+    // 1. Сохраняем саму статью (метаданные)
     if (isEditMode.value) {
-      // Если мы редактируем — вызываем PUT эндпоинт
-      await articlesStore.updateArticle(editingArticleId.value, newArticle.value);
+      savedArticle = await articlesStore.updateArticle(editingArticleId.value, newArticle.value);
     } else {
-      // Если создаем новую — вызывем POST эндпоинт
-      await articlesStore.addArticle(newArticle.value);
+      savedArticle = await articlesStore.addArticle(newArticle.value);
     }
+    
+    // 2. Сохраняем привязку авторов (отправляем массив ID)
+    const authorIds = newArticle.value.authors.map(a => a.id);
+    await api.post(`/articles/${savedArticle.id}/sync-authors/`, { author_ids: authorIds });
+    
     closeModal();
   } catch (error) {
     alert('Ошибка при сохранении изменений.');
   }
 };
 
-// Функция открытия PDF файла в новой вкладке браузера
 const openArticleFile = (pdfPath) => {
   if (!pdfPath) return;
-  // Формируем прямую ссылку на примонтированную бэкендом папку
   const fileUrl = `https://articles-app.ru/${pdfPath}`;
   window.open(fileUrl, '_blank');
 };
 
 onMounted(() => {
   articlesStore.fetchArticles();
+  authorsStore.fetchAuthors(); // При загрузке страницы подтягиваем справочник авторов
 });
 </script>
 
