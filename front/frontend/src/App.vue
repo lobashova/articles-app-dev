@@ -18,7 +18,7 @@
         v-for="tab in tabsStore.openTabs" 
         :key="tab.id"
         :class="['tab-item', { active: tabsStore.activeTabId === tab.id }]"
-        @click="tabsStore.activeTabId = tab.id"
+        @click="tabsStore.setActiveTab(tab.id)"
       >
         {{ tab.title }}
         <span 
