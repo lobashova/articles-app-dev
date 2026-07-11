@@ -229,13 +229,30 @@ def create_draft(project_id: int, title: str, db: Session = Depends(get_db)):
     db.refresh(db_draft)
     return db_draft
 
-# Эндпоинт: Сохранить/обновить текст драфта
+# Эндпоинт: Получить драфт для конкретного проекта (или создать пустой, если его нет)
+@app.get("/projects/{project_id}/draft", response_model=schemas.DraftResponse)
+def get_or_create_project_draft(project_id: int, db: Session = Depends(get_db)):
+    draft = db.query(models.Draft).filter(models.Draft.project_id == project_id).first()
+    if not draft:
+        # Если черновика еще не существовало для этого проекта — автоматически создаем его
+        project = db.query(models.Project).filter(models.Project.id == project_id).first()
+        title = f"Черновик: {project.name}" if project else "Новый черновик"
+        draft = models.Draft(project_id=project_id, title=title, content="")
+        db.add(draft)
+        db.commit()
+        db.refresh(draft)
+    return draft
+
+# Эндпоинт: Сохранить/обновить текст и заголовок драфта
 @app.put("/drafts/{draft_id}")
-def update_draft(draft_id: int, content: str, db: Session = Depends(get_db)):
+def update_draft(draft_id: int, title: str, content: str, db: Session = Depends(get_db)):
     draft = db.query(models.Draft).filter(models.Draft.id == draft_id).first()
+    if not draft:
+        raise HTTPException(status_code=404, detail="Черновик не найден")
+    draft.title = title
     draft.content = content
     db.commit()
-    return {"message": "Draft saved"}
+    return {"message": "Draft saved successfully"}
 
 UPLOAD_DIR = "uploaded_files"
 os.makedirs(UPLOAD_DIR, exist_ok=True)

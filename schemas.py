@@ -115,3 +115,12 @@ class DraftCitationResponse(DraftCitationBase):
 
 class AuthorSync(BaseModel):
     author_ids: list[int]
+
+class DraftResponse(BaseModel):
+    id: int
+    project_id: int
+    title: str
+    content: Optional[str] = ""
+
+    class Config:
+        from_attributes = True
