@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 import models, schemas
+import parser
 from database import engine, SessionLocal
 import shutil
 import os
@@ -242,8 +243,19 @@ async def upload_article(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # Здесь можно вызвать функцию extract_text_from_pdf(file_path)
-    return {"filename": file.filename, "path": file_path}
+    # --- НОВАЯ ЛОГИКА ИЗВЛЕЧЕНИЯ МЕТАДАННЫХ ---
+    extracted_text = parser.extract_text_from_pdf(file_path)
+    doi = parser.extract_doi_from_text(extracted_text)
+    
+    metadata = None
+    if doi:
+        metadata = parser.get_metadata_from_doi(doi)
+        
+    return {
+        "filename": file.filename, 
+        "path": file_path,
+        "extracted_metadata": metadata # Возвращаем найденные данные на клиент
+    }
 
 # Эндпоинт: Создать автора в справочнике
 @app.post("/authors/", response_model=schemas.AuthorResponse)

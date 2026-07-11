@@ -19,6 +19,9 @@
           <div class="form-group">
             <label>Файл статьи (PDF):</label>
             <input type="file" accept=".pdf" @change="handleFileUpload" />
+            <div v-if="isUploading" style="color: #2980b9; font-size: 0.9em; margin-top: 5px;">
+              ⏳ Анализируем PDF и ищем метаданные...
+            </div>
           </div>
 
           <div class="form-row">
@@ -133,6 +136,45 @@ import { useArticlesStore } from '../stores/articles';
 const articlesStore = useArticlesStore();
 const showUploadModal = ref(false);
 const selectedFile = ref(null); // Ссылка на выбранный файл
+// Добавьте это свойство рядом с const showUploadModal = ref(false);
+const isUploading = ref(false);
+
+// --- НОВЫЙ ПОДХОД: Загружаем файл и парсим метаданные сразу при выборе ---
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  isUploading.value = true;
+  try {
+    const uploadResult = await articlesStore.uploadFile(file);
+    newArticle.value.pdf_path = uploadResult.path; // Сохраняем путь
+    
+    // Если сервер нашел DOI и вытащил данные из Crossref — предзаполняем форму
+    if (uploadResult.extracted_metadata) {
+      const meta = uploadResult.extracted_metadata;
+      if (meta.title) newArticle.value.title = meta.title;
+      if (meta.year) newArticle.value.year = meta.year;
+      if (meta.journal) newArticle.value.journal = meta.journal;
+      if (meta.doi) newArticle.value.doi = meta.doi;
+      
+      alert("✨ Метаданные успешно извлечены из PDF!");
+    }
+  } catch (error) {
+    alert("Ошибка при загрузке или анализе файла.");
+  } finally {
+    isUploading.value = false;
+  }
+};
+
+// --- УПРОЩЕННОЕ СОХРАНЕНИЕ (Файл уже на сервере) ---
+const submitArticle = async () => {
+  try {
+    await articlesStore.addArticle(newArticle.value);
+    closeModal();
+  } catch (error) {
+    alert('Ошибка при сохранении статьи. Проверьте консоль.');
+  }
+};
 
 // Базовое состояние новой статьи
 const defaultArticleState = {
@@ -151,32 +193,11 @@ const defaultArticleState = {
 
 const newArticle = ref({ ...defaultArticleState });
 
-// --- НОВАЯ ФУНКЦИЯ: Захват файла при выборе ---
-const handleFileUpload = (event) => {
-  selectedFile.value = event.target.files[0];
-};
 
 const closeModal = () => {
   showUploadModal.value = false;
   newArticle.value = { ...defaultArticleState }; // Сброс формы
   selectedFile.value = null; // Сброс выбранного файла
-};
-
-// --- ОБНОВЛЕННАЯ ФУНКЦИЯ: Двухэтапное сохранение ---
-const submitArticle = async () => {
-  try {
-    // Этап 1: Если файл выбран, сначала загружаем его
-    if (selectedFile.value) {
-      const uploadResult = await articlesStore.uploadFile(selectedFile.value);
-      newArticle.value.pdf_path = uploadResult.path; // Прикрепляем путь к метаданным
-    }
-    
-    // Этап 2: Сохраняем статью в БД (уже с заполненным pdf_path)
-    await articlesStore.addArticle(newArticle.value);
-    closeModal();
-  } catch (error) {
-    alert('Ошибка при сохранении статьи или загрузке файла. Проверьте консоль.');
-  }
 };
 
 onMounted(() => {
