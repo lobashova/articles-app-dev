@@ -398,7 +398,7 @@ const saveNotes = async () => {
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue'; // <--- ДОБАВИТЬ computed СЮДА
 import api from '../api';
 import { useTabsStore } from '../stores/tabs';
 import { useArticlesStore } from '../stores/articles';
@@ -411,14 +411,16 @@ const tagsStore = useTagsStore();
 const articleId = ref(null);
 const pdfPath = ref('');
 const isSaving = ref(false);
-const selectedTag = ref(null);
+const selectedTag = ref(null); 
 const newTagName = ref('');
+const newTagColor = ref('#3498db'); // Инициализируем цвет
 const articleTags = ref([]);
+const isDropdownOpen = ref(false); // Инициализируем состояние дропдауна
 
 const notes = ref({ aims: '', methods: '', results: '', comments: '' });
 const noteIds = ref({ aims: null, methods: null, results: null, comments: null });
 
-const newTagColor = ref('#3498db');
+
 
 const loadArticleData = async () => {
   const activeTabId = tabsStore.activeTabId;
@@ -482,6 +484,7 @@ const addTagToArticle = async (tag) => {
   }
 };
 
+// УМНЫЙ ПОИСК ТЕГОВ
 const filteredTags = computed(() => {
   return tagsStore.list.filter(t => 
     t.name.toLowerCase().includes(newTagName.value.toLowerCase())
