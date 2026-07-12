@@ -366,18 +366,29 @@ const saveNotes = async () => {
 
         <div class="note-group">
           <label>🏷 Теги</label>
-          <div class="tags-list" style="margin-bottom: 10px;">
-            <span v-for="tag in articleTags" :key="tag.id" class="tag-badge">
+          
+          <div class="tags-list">
+            <span v-for="tag in articleTags" :key="tag.id" class="tag-badge" :style="{ backgroundColor: tag.color }">
               {{ tag.name }}
             </span>
           </div>
-          <div class="form-row">
-            <select v-model="selectedTag" @change="addTagToArticle(selectedTag)" class="half">
-              <option :value="null">-- Добавить тег --</option>
-              <option v-for="t in tagsStore.list" :key="t.id" :value="t">{{ t.name }}</option>
-            </select>
-            <input v-model="newTagName" placeholder="Новый тег..." class="quarter" />
-            <button @click="createAndAddTag" class="add-tag-btn">+</button>
+
+          <div class="tag-input-wrapper">
+            <input 
+              v-model="newTagName" 
+              @input="isDropdownOpen = true"
+              placeholder="Начните вводить тэг..." 
+              class="search-input"
+            />
+            <ul v-if="isDropdownOpen && newTagName" class="tag-dropdown">
+              <li v-for="t in filteredTags" :key="t.id" @mousedown="addTagToArticle(t)" class="dropdown-item">
+                <span class="color-dot" :style="{ background: t.color }"></span> {{ t.name }}
+              </li>
+              <li v-if="!filteredTags.length" @mousedown="createAndAddTag" class="dropdown-item create-new">
+                + Создать тэг "{{ newTagName }}"
+              </li>
+            </ul>
+            <input type="color" v-model="newTagColor" class="color-picker" title="Выберите цвет">
           </div>
         </div>
         
@@ -406,6 +417,8 @@ const articleTags = ref([]);
 
 const notes = ref({ aims: '', methods: '', results: '', comments: '' });
 const noteIds = ref({ aims: null, methods: null, results: null, comments: null });
+
+const newTagColor = ref('#3498db');
 
 const loadArticleData = async () => {
   const activeTabId = tabsStore.activeTabId;
@@ -469,15 +482,20 @@ const addTagToArticle = async (tag) => {
   }
 };
 
+const filteredTags = computed(() => {
+  return tagsStore.list.filter(t => 
+    t.name.toLowerCase().includes(newTagName.value.toLowerCase())
+  );
+});
+
 const createAndAddTag = async () => {
   if (!newTagName.value) return;
   try {
-    const tag = await tagsStore.createTag(newTagName.value);
-    await addTagToArticle(tag);
+    // В createTag в сторе добавьте передачу color
+    const tag = await api.post('/tags/', { name: newTagName.value, color: newTagColor.value });
+    await addTagToArticle(tag.data);
     newTagName.value = '';
-  } catch (error) {
-    alert("Ошибка при создании тега");
-  }
+  } catch (e) { alert("Ошибка создания"); }
 };
 
 const saveNotes = async () => {
@@ -616,4 +634,13 @@ const saveNotes = async () => {
   border-radius: 4px;
   cursor: pointer;
 }
+
+.tag-input-wrapper { display: flex; gap: 5px; position: relative; margin-top: 5px; }
+.search-input { flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+.color-picker { width: 40px; height: 40px; border: none; cursor: pointer; background: none; }
+.tag-dropdown { position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #eee; z-index: 10; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.dropdown-item { padding: 8px; cursor: pointer; display: flex; align-items: center; }
+.dropdown-item:hover { background: #f0f0f0; }
+.color-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+.tag-badge { color: white; padding: 4px 10px; border-radius: 15px; margin-right: 5px; display: inline-block; }
 </style> 

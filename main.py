@@ -142,14 +142,23 @@ def delete_article(article_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Статья успешно удалена"}
 
-# Эндпоинт: Создать новый тег
+# Эндпоинт: Создать тег с цветом
 @app.post("/tags/", response_model=schemas.TagResponse)
 def create_tag(tag: schemas.TagCreate, db: Session = Depends(get_db)):
-    db_tag = models.Tag(name=tag.name)
+    db_tag = models.Tag(name=tag.name, color=tag.color or "#3498db")
     db.add(db_tag)
     db.commit()
     db.refresh(db_tag)
     return db_tag
+
+# Эндпоинт: Обновить цвет тега
+@app.put("/tags/{tag_id}", response_model=schemas.TagResponse)
+def update_tag(tag_id: int, color: str, db: Session = Depends(get_db)):
+    tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
+    if not tag: raise HTTPException(status_code=404, detail="Тег не найден")
+    tag.color = color
+    db.commit()
+    return tag
 
 # Эндпоинт: Получить список всех тегов
 @app.get("/tags/", response_model=list[schemas.TagResponse])
