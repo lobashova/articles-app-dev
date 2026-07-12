@@ -142,9 +142,10 @@ def delete_article(article_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Статья успешно удалена"}
 
-# Эндпоинт: Создать тег с цветом
+# Эндпоинт: Создать тег
 @app.post("/tags/", response_model=schemas.TagResponse)
 def create_tag(tag: schemas.TagCreate, db: Session = Depends(get_db)):
+    # Используем цвет из запроса или дефолтный
     db_tag = models.Tag(name=tag.name, color=tag.color or "#3498db")
     db.add(db_tag)
     db.commit()

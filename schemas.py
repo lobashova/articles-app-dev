@@ -48,7 +48,7 @@ class TagBase(BaseModel):
     name: str
 
 class TagCreate(TagBase):
-    pass
+    color: Optional[str] = "#3498db" # Добавьте это поле
 
 class TagResponse(TagBase):
     id: int
