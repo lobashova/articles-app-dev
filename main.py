@@ -157,18 +157,18 @@ def get_tags(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     tags = db.query(models.Tag).offset(skip).limit(limit).all()
     return tags
 
-# Эндпоинт: Привязать тег к статье
-@app.post("/articles/{article_id}/tags/{tag_id}")
-def add_tag_to_article(article_id: int, tag_id: int, db: Session = Depends(get_db)):
-    article = db.query(models.Article).filter(models.Article.id == article_id).first()
-    tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
+# # Эндпоинт: Привязать тег к статье
+# @app.post("/articles/{article_id}/tags/{tag_id}")
+# def add_tag_to_article(article_id: int, tag_id: int, db: Session = Depends(get_db)):
+#     article = db.query(models.Article).filter(models.Article.id == article_id).first()
+#     tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
     
-    if not article or not tag:
-        return {"error": "Статья или тег не найдены"}
+#     if not article or not tag:
+#         return {"error": "Статья или тег не найдены"}
     
-    article.tags.append(tag)
-    db.commit()
-    return {"message": "Тег успешно привязан"}
+#     article.tags.append(tag)
+#     db.commit()
+#     return {"message": "Тег успешно привязан"}
 
 # Эндпоинт: Добавить заметку к статье
 @app.post("/articles/{article_id}/notes/", response_model=schemas.NoteResponse)
@@ -378,3 +378,27 @@ def get_article_authors(article_id: int, db: Session = Depends(get_db)):
                 "initials": author.initials
             })
     return result
+
+# Эндпоинт: Привязать тег к статье (с защитой от дублей)
+@app.post("/articles/{article_id}/tags/{tag_id}")
+def add_tag_to_article(article_id: int, tag_id: int, db: Session = Depends(get_db)):
+    article = db.query(models.Article).filter(models.Article.id == article_id).first()
+    tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
+    
+    if not article or not tag:
+        raise HTTPException(status_code=404, detail="Статья или тег не найдены")
+    
+    # Защита от дубликатов: если тега еще нет у статьи, то добавляем
+    if tag not in article.tags:
+        article.tags.append(tag)
+        db.commit()
+        
+    return {"message": "Тег успешно привязан"}
+
+# Эндпоинт: Получить теги конкретной статьи
+@app.get("/articles/{article_id}/tags/", response_model=list[schemas.TagResponse])
+def get_article_tags(article_id: int, db: Session = Depends(get_db)):
+    article = db.query(models.Article).filter(models.Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Статья не найдена")
+    return article.tags

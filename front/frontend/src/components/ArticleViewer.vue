@@ -387,7 +387,7 @@ const saveNotes = async () => {
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'; // Добавили watch
+import { ref, onMounted, watch } from 'vue';
 import api from '../api';
 import { useTabsStore } from '../stores/tabs';
 import { useArticlesStore } from '../stores/articles';
@@ -400,27 +400,26 @@ const tagsStore = useTagsStore();
 const articleId = ref(null);
 const pdfPath = ref('');
 const isSaving = ref(false);
-const selectedTag = ref(null); // ОБЪЯВИЛИ ПЕРЕМЕННУЮ
+const selectedTag = ref(null);
 const newTagName = ref('');
 const articleTags = ref([]);
 
 const notes = ref({ aims: '', methods: '', results: '', comments: '' });
 const noteIds = ref({ aims: null, methods: null, results: null, comments: null });
 
-// Функция загрузки данных статьи
 const loadArticleData = async () => {
   const activeTabId = tabsStore.activeTabId;
   if (!activeTabId || !activeTabId.startsWith('viewer-')) return;
   
   articleId.value = parseInt(activeTabId.split('-')[1]);
   
-  // 1. Ищем PDF путь (с учетом того, что список статей мог еще не загрузиться)
+  // Ищем статью. Если список еще грузится, watch подхватит её позже
   const article = articlesStore.list.find(a => a.id === articleId.value);
   if (article) {
     pdfPath.value = article.pdf_path;
   }
 
-  // 2. Загружаем заметки
+  // Загружаем заметки
   try {
     const response = await api.get(`/articles/${articleId.value}/notes/`);
     response.data.forEach(note => {
@@ -429,24 +428,42 @@ const loadArticleData = async () => {
         noteIds.value[note.field_type] = note.id;
       }
     });
-  } catch (e) { console.error(e); }
+  } catch (e) { console.error("Ошибка загрузки заметок:", e); }
+
+  // ЗАГРУЖАЕМ ТЕГИ, УЖЕ ПРИВЯЗАННЫЕ К СТАТЬЕ
+  try {
+    const tagsRes = await api.get(`/articles/${articleId.value}/tags/`);
+    articleTags.value = tagsRes.data;
+  } catch (e) { console.error("Ошибка загрузки тегов:", e); }
 };
 
-// --- НАБЛЮДАТЕЛЬ (WATCH) ---
-// Если список статей загрузился позже, чем открылся вьювер — обновим PDF путь
 watch(() => articlesStore.list, () => {
   if (!pdfPath.value) loadArticleData();
 }, { deep: true });
 
 onMounted(async () => {
+  // РЕШЕНИЕ ПРОБЛЕМЫ ПУСТОГО PDF: Если список статей пуст (нажали F5), грузим его!
+  if (articlesStore.list.length === 0) {
+    await articlesStore.fetchArticles();
+  }
+  
   await loadArticleData();
   tagsStore.fetchTags();
 });
 
 const addTagToArticle = async (tag) => {
+  if (!tag) return;
+  
+  // Проверяем, не привязан ли уже этот тег (чтобы не было ошибок на сервере)
+  if (articleTags.value.find(t => t.id === tag.id)) {
+    selectedTag.value = null; // просто сбрасываем выпадающий список
+    return;
+  }
+  
   try {
     await api.post(`/articles/${articleId.value}/tags/${tag.id}`);
     articleTags.value.push(tag);
+    selectedTag.value = null; // Очищаем выбор после успешного добавления
   } catch (error) {
     alert("Не удалось привязать тег");
   }
@@ -454,29 +471,30 @@ const addTagToArticle = async (tag) => {
 
 const createAndAddTag = async () => {
   if (!newTagName.value) return;
-  const tag = await tagsStore.createTag(newTagName.value);
-  await addTagToArticle(tag);
-  newTagName.value = '';
+  try {
+    const tag = await tagsStore.createTag(newTagName.value);
+    await addTagToArticle(tag);
+    newTagName.value = '';
+  } catch (error) {
+    alert("Ошибка при создании тега");
+  }
 };
 
 const saveNotes = async () => {
   isSaving.value = true;
   try {
-    // Проходим по каждому полю (aims, methods, results, comments)
     for (const field of Object.keys(notes.value)) {
       const content = notes.value[field];
       const id = noteIds.value[field];
 
       if (id) {
-        // Если заметка уже была в базе — обновляем её (PUT)
         await api.put(`/notes/${id}`, { field_type: field, content: content });
       } else if (content.trim() !== '') {
-        // Если заметки не было, но текст появился — создаем новую (POST)
         const res = await api.post(`/articles/${articleId.value}/notes/`, { 
           field_type: field, 
           content: content 
         });
-        noteIds.value[field] = res.data.id; // Запоминаем новый ID
+        noteIds.value[field] = res.data.id;
       }
     }
   } catch (error) {
