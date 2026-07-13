@@ -4,7 +4,7 @@ import api from '../api';
 export const useDraftsStore = defineStore('drafts', {
   state: () => ({
     currentDraft: null,
-    citations: [], // Список привязанных статей к текущему драфту
+    citations: [],
     isLoading: false,
     isSaving: false
   }),
@@ -14,10 +14,7 @@ export const useDraftsStore = defineStore('drafts', {
       try {
         const response = await api.get(`/projects/${projectId}/draft`);
         this.currentDraft = response.data;
-        
-        // Сразу подгружаем цитаты для этого драфта
         await this.fetchDraftCitations(response.data.id);
-        
         return response.data;
       } catch (error) {
         console.error('Ошибка при загрузке черновика:', error);
@@ -37,8 +34,6 @@ export const useDraftsStore = defineStore('drafts', {
         this.isSaving = false;
       }
     },
-    
-    // --- НОВЫЕ ДЕЙСТВИЯ ДЛЯ РАБОТЫ С ЦИТАТАМИ ---
     async fetchDraftCitations(draftId) {
       try {
         const response = await api.get(`/drafts/${draftId}/citations/`);
@@ -58,6 +53,18 @@ export const useDraftsStore = defineStore('drafts', {
         return response.data;
       } catch (error) {
         console.error('Ошибка привязки цитаты:', error);
+      }
+    },
+
+    // --- НОВОЕ ДЕЙСТВИЕ: Удаление цитаты из базы данных ---
+    async removeDraftCitation(citationId) {
+      try {
+        await api.delete(`/draft-citations/${citationId}`);
+        // Удаляем из локального состояния массива на фронтенде
+        this.citations = this.citations.filter(c => c.id !== citationId);
+      } catch (error) {
+        console.error('Ошибка при удалении цитаты:', error);
+        alert('Не удалось удалить статью из списка литературы.');
       }
     }
   }
