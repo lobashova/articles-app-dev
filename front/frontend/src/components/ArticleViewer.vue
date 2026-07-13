@@ -322,9 +322,15 @@ const saveNotes = async () => {
     <div class="info-pane">
       <div class="info-header">
         <h3>📝 Анализ статьи</h3>
-        <button @click="saveNotes" class="save-btn" :disabled="isSaving">
-          {{ isSaving ? '⏳ Сохранение...' : '💾 Сохранить' }}
-        </button>
+        <div style="display: flex; gap: 10px;">
+          <button @click="copyApaCitation" class="apa-btn" title="Скопировать в формате APA">
+            📋 APA
+          </button>
+          
+          <button @click="saveNotes" class="save-btn" :disabled="isSaving">
+            {{ isSaving ? '⏳ Сохранение...' : '💾 Сохранить' }}
+          </button>
+        </div>
       </div>
 
       <div class="notes-container">
@@ -622,6 +628,22 @@ const handleDeleteTag = async (tagId) => {
     }
   }
 };
+
+// --- ГЕНЕРАЦИЯ И КОПИРОВАНИЕ APA ---
+const copyApaCitation = async () => {
+  try {
+    const response = await api.get(`/articles/${articleId.value}/apa`);
+    const citationText = response.data.citation;
+    
+    // Копируем текст в буфер обмена браузера
+    await navigator.clipboard.writeText(citationText);
+    
+    alert("✅ Цитата скопирована:\n\n" + citationText);
+  } catch (error) {
+    console.error(error);
+    alert("Не удалось сгенерировать цитату. Проверьте консоль.");
+  }
+};
 </script>
 <style scoped>
 .viewer-wrapper {
@@ -786,4 +808,17 @@ const handleDeleteTag = async (tagId) => {
 }
 .tag-control-btn.save-t { background: #2ecc71; }
 .tag-control-btn.cancel-t { background: #95a5a6; }
+.apa-btn {
+  background: #f39c12;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s;
+}
+.apa-btn:hover {
+  background: #e67e22;
+}
 </style> 

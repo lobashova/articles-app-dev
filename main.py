@@ -444,3 +444,61 @@ def get_article_tags(article_id: int, db: Session = Depends(get_db)):
     if not article:
         raise HTTPException(status_code=404, detail="Статья не найдена")
     return article.tags
+
+# Эндпоинт: Сгенерировать цитату по стандарту APA
+@app.get("/articles/{article_id}/apa")
+def get_article_apa(article_id: int, db: Session = Depends(get_db)):
+    article = db.query(models.Article).filter(models.Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Статья не найдена")
+        
+    # Получаем авторов с учетом их порядка (order_index)
+    links = db.query(models.ArticleAuthor).filter(models.ArticleAuthor.article_id == article_id).order_by(models.ArticleAuthor.order_index).all()
+    authors = []
+    for link in links:
+        author = db.query(models.Author).filter(models.Author.id == link.author_id).first()
+        if author:
+            authors.append(f"{author.last_name}, {author.initials}")
+            
+    # Правило APA: перечисление авторов (через запятую, перед последним '&')
+    if not authors:
+        author_str = "Автор неизвестен."
+    elif len(authors) == 1:
+        author_str = f"{authors[0]}."
+    elif len(authors) == 2:
+        author_str = f"{authors[0]} & {authors[1]}."
+    else:
+        author_str = ", ".join(authors[:-1]) + f", & {authors[-1]}."
+        
+    # Год издания
+    year_str = f"({article.year})." if article.year else "(н.д.)."
+    
+    # Название статьи/книги
+    title_str = f"{article.title}."
+    
+    # Сборка основы
+    citation = f"{author_str} {year_str} {title_str}"
+    
+    # Специфичные поля в зависимости от типа публикации
+    if article.type == "Journal Article" and article.journal:
+        citation += f" {article.journal},"
+        if article.issue:
+            citation += f" ({article.issue}),"
+        if article.pages:
+            citation += f" {article.pages}."
+    elif article.type == "Book":
+        if article.edition:
+            citation += f" ({article.edition} ed.)."
+            
+    # Ссылки: DOI в приоритете, иначе Web Link
+    if article.doi:
+        doi_link = article.doi if article.doi.startswith("http") else f"https://doi.org/{article.doi}"
+        citation += f" {doi_link}"
+    elif article.web_link:
+        citation += f" {article.web_link}"
+        
+    # Очищаем от лишних пробелов (на случай если какое-то поле пустое)
+    import re
+    citation = re.sub(' +', ' ', citation)
+    
+    return {"citation": citation.strip()}
