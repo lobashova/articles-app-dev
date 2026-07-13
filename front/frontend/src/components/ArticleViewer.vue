@@ -494,11 +494,25 @@ const filteredTags = computed(() => {
 const createAndAddTag = async () => {
   if (!newTagName.value) return;
   try {
-    // В createTag в сторе добавьте передачу color
-    const tag = await api.post('/tags/', { name: newTagName.value, color: newTagColor.value });
-    await addTagToArticle(tag.data);
+    // Отправляем запрос на создание
+    const response = await api.post('/tags/', { 
+      name: newTagName.value, 
+      color: newTagColor.value 
+    });
+    
+    const newTag = response.data;
+    
+    // Добавляем созданный тег в общий справочник хранилища
+    tagsStore.list.push(newTag);
+    
+    // Привязываем тег к текущей статье
+    await addTagToArticle(newTag);
+    
+    // Очищаем инпут
     newTagName.value = '';
-  } catch (e) { alert("Ошибка создания"); }
+  } catch (e) { 
+    alert("Ошибка создания тега"); 
+  }
 };
 
 const saveNotes = async () => {

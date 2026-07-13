@@ -44,11 +44,13 @@ class ArticleResponse(ArticleBase):
         from_attributes = True
 
 # --- СХЕМЫ ДЛЯ ТЕГОВ ---
+# --- СХЕМЫ ДЛЯ ТЕГОВ ---
 class TagBase(BaseModel):
     name: str
+    color: Optional[str] = "#3498db" # <-- Добавили цвет прямо в базу
 
 class TagCreate(TagBase):
-    color: Optional[str] = "#3498db" # Добавьте это поле
+    pass
 
 class TagResponse(TagBase):
     id: int
