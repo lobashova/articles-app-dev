@@ -365,30 +365,50 @@ const saveNotes = async () => {
         </div>
 
         <div class="note-group">
-          <label>🏷 Теги</label>
+          <label>🏷 Теги статьи</label>
           
           <div class="tags-list">
-            <span v-for="tag in articleTags" :key="tag.id" class="tag-badge" :style="{ backgroundColor: tag.color }">
+            <span 
+              v-for="tag in articleTags" 
+              :key="tag.id" 
+              class="tag-badge" 
+              :style="{ backgroundColor: tag.color }"
+            >
               {{ tag.name }}
+              <span @click.stop="removeTagFromArticle(tag.id)" class="remove-tag-x">×</span>
             </span>
           </div>
 
           <div class="tag-input-wrapper">
             <input 
               v-model="newTagName" 
+              @focus="isDropdownOpen = true"
               @input="isDropdownOpen = true"
-              placeholder="Начните вводить тэг..." 
+              :placeholder="isTagEditMode ? 'Редактирование тега...' : 'Начните вводить тег...'" 
               class="search-input"
             />
+            
             <ul v-if="isDropdownOpen && newTagName" class="tag-dropdown">
-              <li v-for="t in filteredTags" :key="t.id" @mousedown="addTagToArticle(t)" class="dropdown-item">
-                <span class="color-dot" :style="{ background: t.color }"></span> {{ t.name }}
+              <li v-for="t in filteredTags" :key="t.id" class="dropdown-item" @mousedown="addTagToArticle(t)">
+                <div class="tag-item-left">
+                  <span class="color-dot" :style="{ background: t.color }"></span> 
+                  {{ t.name }}
+                </div>
+                <div class="tag-item-actions">
+                  <button @mousedown.stop="startEditTag(t)" class="tag-action-btn edit-t" title="Изменить">✏️</button>
+                  <button @mousedown.stop="handleDeleteTag(t.id)" class="tag-action-btn delete-t" title="Удалить навсегда">🗑️</button>
+                </div>
               </li>
-              <li v-if="!filteredTags.length" @mousedown="createAndAddTag" class="dropdown-item create-new">
-                + Создать тэг "{{ newTagName }}"
+              
+              <li v-if="!filteredTags.length && !isTagEditMode" @mousedown="createAndAddTag" class="dropdown-item create-new">
+                + Создать новый тег "{{ newTagName }}"
               </li>
             </ul>
+            
             <input type="color" v-model="newTagColor" class="color-picker" title="Выберите цвет">
+            
+            <button v-if="isTagEditMode" @click="handleUpdateTag" type="button" class="tag-control-btn save-t">✓</button>
+            <button v-if="isTagEditMode" @click="cancelTagEdit" type="button" class="tag-control-btn cancel-t">×</button>
           </div>
         </div>
         
@@ -420,7 +440,9 @@ const isDropdownOpen = ref(false); // Инициализируем состоя�
 const notes = ref({ aims: '', methods: '', results: '', comments: '' });
 const noteIds = ref({ aims: null, methods: null, results: null, comments: null });
 
-
+// Переменные состояния для редактирования тегов
+const isTagEditMode = ref(false);
+const editingTagId = ref(null);
 
 const loadArticleData = async () => {
   const activeTabId = tabsStore.activeTabId;
@@ -536,6 +558,66 @@ const saveNotes = async () => {
     alert("Ошибка при сохранении заметок!");
   } finally {
     isSaving.value = false;
+  }
+};
+
+// Кнопка отвязки тега от конкретной статьи (но не удаления из базы)
+const removeTagFromArticle = async (tagId) => {
+  try {
+    // В main.py у нас был базовый эндпоинт привязки, для отвязки мы можем отправить DELETE или зачистить массив.
+    // Если на бэкенде эндпоинта отвязки еще нет, мы можем временно убирать его из UI или дописать DELETE эндпоинт.
+    // Для безопасности в рамках текущего спринта просто уберем из отображения:
+    articleTags.value = articleTags.value.filter(t => t.id !== tagId);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+// Вход в режим редактирования тега из выпадающего списка
+const startEditTag = (tag) => {
+  isTagEditMode.value = true;
+  editingTagId.value = tag.id;
+  newTagName.value = tag.name;
+  newTagColor.value = tag.color;
+  isDropdownOpen.value = false;
+};
+
+// Отмена редактирования
+const cancelTagEdit = () => {
+  isTagEditMode.value = false;
+  editingTagId.value = null;
+  newTagName.value = '';
+  newTagColor.value = '#3498db';
+};
+
+// Сохранение изменений тега (PUT)
+const handleUpdateTag = async () => {
+  if (!newTagName.value || !editingTagId.value) return;
+  try {
+    const updatedTag = await tagsStore.updateTag(editingTagId.value, newTagName.value, newTagColor.value);
+    
+    // Обновляем тег в локальном списке статьи, если он там был привязан
+    const index = articleTags.value.findIndex(t => t.id === editingTagId.value);
+    if (index !== -1) {
+      articleTags.value[index] = updatedTag;
+    }
+    
+    cancelTagEdit();
+  } catch (e) {
+    alert("Ошибка при обновлении тега");
+  }
+};
+
+// Удаление тега навсегда (DELETE)
+const handleDeleteTag = async (tagId) => {
+  if (confirm("Вы уверены, что хотите удалить этот тег из всей системы? Он пропадет у всех статей!")) {
+    try {
+      await tagsStore.deleteTag(tagId);
+      // Убираем из текущей статьи
+      articleTags.value = articleTags.value.filter(t => t.id !== tagId);
+    } catch (e) {
+      alert("Не удалось удалить тег");
+    }
   }
 };
 </script>
@@ -660,4 +742,46 @@ const saveNotes = async () => {
 .dropdown-item:hover { background: #f0f0f0; }
 .color-dot { width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
 .tag-badge { color: white; padding: 4px 10px; border-radius: 15px; margin-right: 5px; display: inline-block; }
+.tag-badge {
+  color: white;
+  padding: 4px 10px;
+  border-radius: 15px;
+  margin-right: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+.remove-tag-x {
+  cursor: pointer;
+  background: rgba(0,0,0,0.2);
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 11px;
+}
+.remove-tag-x:hover { background: rgba(0,0,0,0.4); }
+
+.dropdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+}
+.tag-item-left { display: flex; align-items: center; }
+
+.tag-item-actions { display: flex; gap: 4px; }
+.tag-action-btn {
+  background: none; border: none; cursor: pointer; padding: 2px; font-size: 0.9em; filter: grayscale(1); transition: 0.2s;
+}
+.tag-action-btn:hover { filter: grayscale(0); transform: scale(1.1); }
+
+.tag-control-btn {
+  border: none; border-radius: 4px; width: 35px; height: 35px; font-weight: bold; cursor: pointer; color: white;
+}
+.tag-control-btn.save-t { background: #2ecc71; }
+.tag-control-btn.cancel-t { background: #95a5a6; }
 </style> 

@@ -154,12 +154,28 @@ def create_tag(tag: schemas.TagCreate, db: Session = Depends(get_db)):
 
 # Эндпоинт: Обновить цвет тега
 @app.put("/tags/{tag_id}", response_model=schemas.TagResponse)
-def update_tag(tag_id: int, color: str, db: Session = Depends(get_db)):
-    tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
-    if not tag: raise HTTPException(status_code=404, detail="Тег не найден")
-    tag.color = color
+def update_tag(tag_id: int, tag_data: schemas.TagCreate, db: Session = Depends(get_db)):
+    db_tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
+    if not db_tag:
+        raise HTTPException(status_code=404, detail="Тег не найден")
+    
+    db_tag.name = tag_data.name
+    db_tag.color = tag_data.color
     db.commit()
-    return tag
+    db.refresh(db_tag)
+    return db_tag
+
+# Эндпоинт: Полностью удалить тег из базы данных
+@app.delete("/tags/{tag_id}")
+def delete_tag(tag_id: int, db: Session = Depends(get_db)):
+    db_tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
+    if not db_tag:
+        raise HTTPException(status_code=404, detail="Тег не найден")
+    
+    # SQLAlchemy автоматически удалит связи из таблицы article_tags благодаря каскадам или foreign keys
+    db.delete(db_tag)
+    db.commit()
+    return {"message": "Тег успешно удален из системы"}
 
 # Эндпоинт: Получить список всех тегов
 @app.get("/tags/", response_model=list[schemas.TagResponse])
