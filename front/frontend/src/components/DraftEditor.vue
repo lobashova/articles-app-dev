@@ -139,6 +139,7 @@ const selectedPdfPath = ref('');
 const searchQuery = ref('');
 const isDropdownOpen = ref(false);
 
+// Фильтруем статьи по поисковому запросу
 const filteredArticles = computed(() => {
   const query = searchQuery.value.toLowerCase();
   if (!query) return articlesStore.list;
@@ -153,25 +154,29 @@ const handleArticleSelect = (article) => {
   searchQuery.value = article.title;
 };
 
-// Функция вставки ссылки-маркера в текст и сохранения связи на бэкенде
+// Функция вставки ссылки-маркера в текст
 const insertCitation = async (article) => {
-  // Вычисляем порядковый номер для нового маркера
   const citationNumber = draftsStore.citations.length + 1;
   const marker = ``;
   
-  // 1. Сохраняем связь в таблицу draft_citations через API
+  // Сохраняем связь в базу данных
   await draftsStore.addDraftCitation(serverDraftId.value, article.id, marker);
   
-  // 2. Вставляем маркер прямо в текст на позицию курсора (или просто в конец для простоты)
+  // Добавляем маркер в текст
   draftContent.value += ` ${marker} `;
   isDropdownOpen.value = false;
   searchQuery.value = '';
 };
 
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ: Теперь гарантированно активирует Split View и передает путь к PDF
 const openInSplitView = (article) => {
+  if (!article.pdf_path) {
+    alert("У этой статьи нет загруженного PDF-файла!");
+    return;
+  }
   selectedPdfPath.value = article.pdf_path;
   searchQuery.value = article.title;
-  isSplitView.value = true;
+  isSplitView.value = true; // Принудительно включаем разделение экрана
   isDropdownOpen.value = false;
 };
 
@@ -180,7 +185,7 @@ const getArticleTitleById = (id) => {
   return art ? art.title : 'Неизвестный источник';
 };
 
-// Функция автоматической сборки списка литературы на базе эндпоинта /apa
+// Функция автоматической сборки списка литературы APA
 const generateBibliography = async () => {
   if (draftsStore.citations.length === 0) {
     alert("Нет цитируемых источников для сборки списка!");
@@ -192,20 +197,22 @@ const generateBibliography = async () => {
   try {
     for (const citation of draftsStore.citations) {
       const res = await api.get(`/articles/${citation.article_id}/apa`);
-      bibSection += `* ${res.data.citation}\n`;
+      bibSection += `* {res.data.citation}\n`;
     }
     
-    // Прикрепляем сгенерированный блок в самый конец вашего черновика!
     draftContent.value += bibSection;
     alert("✨ Список литературы по стандарту APA успешно сгенерирован и добавлен в конец статьи!");
-    await handleSave(); // Сразу сохраняем изменения
+    await handleSave();
   } catch (error) {
     alert("Ошибка при сборке библиографии");
   }
 };
 
+// Увеличили задержку закрытия списка до 300мс, чтобы клик (mousedown) по кнопкам "Цитата" и "Просмотр" успевал сработать
 const hideDropdown = () => {
-  setTimeout(() => { isDropdownOpen.value = false; }, 250);
+  setTimeout(() => { 
+    isDropdownOpen.value = false; 
+  }, 300);
 };
 
 // --- ЛОГИКА ИЗМЕНЕНИЯ РАЗМЕРА ОКОН (DRAG) ---
@@ -234,7 +241,7 @@ const toggleSplitView = () => {
   }
 };
 
-// Синхронизация данных драфта при открытии
+// Синхронизация данных драфта при открытии вкладки
 onMounted(async () => {
   if (articlesStore.list.length === 0) {
     articlesStore.fetchArticles();
