@@ -20,7 +20,7 @@
               @focus="isDropdownOpen = true"
               @blur="hideDropdown"
               type="text"
-              placeholder="🔍 Найти статью для цитирования/Split View..."
+              placeholder="🔍 Быстрый поиск статьи..."
               class="article-search-input"
             />
             
@@ -28,15 +28,14 @@
               <li 
                 v-for="article in filteredArticles" 
                 :key="article.id"
-                @mousedown="handleArticleSelect(article)"
+                @mousedown="selectArticleForView(article)"
                 class="dropdown-item"
               >
-                <div class="dropdown-row">
-                  <span class="title-text">{{ article.title }}</span>
-                  <div class="item-actions">
-                    <button @click.prevent.stop="insertCitation(article)" class="cite-action-btn" title="Вставить цитату в текст">➕ Цитата</button>
-                    <button @click.prevent.stop="openInSplitView(article)" class="view-action-btn" title="Открыть в Split View">📖 Просмотр</button>
-                  </div>
+                <div style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  {{ article.title }}
+                </div>
+                <div style="font-size: 0.8em; color: #7f8c8d;">
+                  Год: {{ article.year || 'н.д.' }} | {{ article.journal || 'Журнал не указан' }}
                 </div>
               </li>
               <li v-if="filteredArticles.length === 0" class="dropdown-item empty">
@@ -69,24 +68,35 @@
       >
         
         <div class="editor-pane" :style="{ width: isSplitView ? editorWidth + '%' : '100%' }">
-          <MdEditor 
-            v-model="draftContent" 
-            language="en-US" 
-            :preview="false" 
-            class="md-editor-custom"
-          />
           
-          <div class="bibliography-panel">
-            <div class="panel-header">
-              <h4>📚 Используемая литература проекта (Цитируемые источники)</h4>
-              <button @click="generateBibliography" class="gen-bib-btn">📝 Сгенерировать APA список</button>
+          <div class="editor-container" :style="{ height: isBibliographyOpen ? '65%' : '100%' }">
+            <MdEditor 
+              v-model="draftContent" 
+              language="en-US" 
+              :preview="false" 
+              class="md-editor-custom"
+            />
+          </div>
+          
+          <div :class="['bibliography-panel', { 'is-collapsed': !isBibliographyOpen }]">
+            <div class="panel-header" @click="isBibliographyOpen = !isBibliographyOpen">
+              <span class="panel-title-wrapper">
+                <span class="arrow-icon">{{ isBibliographyOpen ? '▼' : '▲' }}</span>
+                <h4>📚 Используемая литература проекта ({{ draftsStore.citations.length }})</h4>
+              </span>
+              <button v-if="isBibliographyOpen" @click.stop="generateBibliography" class="gen-bib-btn">
+                📝 Сгенерировать APA список
+              </button>
             </div>
-            <ul v-if="draftsStore.citations.length > 0" class="citation-links-list">
-              <li v-for="cit in draftsStore.citations" :key="cit.id" class="citation-link-item">
-                <span class="marker-badge">{{ cit.in_text_marker }}</span> — {{ getArticleTitleById(cit.article_id) }}
-              </li>
-            </ul>
-            <div v-else class="empty-bib">Вы пока не процитировали ни одну статью в этом тексте. Используйте поиск сверху.</div>
+            
+            <div v-if="isBibliographyOpen" class="panel-content">
+              <ul v-if="draftsStore.citations.length > 0" class="citation-links-list">
+                <li v-for="cit in draftsStore.citations" :key="cit.id" class="citation-link-item">
+                  <span class="marker-badge">{{ cit.in_text_marker }}</span> — {{ getArticleTitleById(cit.article_id) }}
+                </li>
+              </ul>
+              <div v-else class="empty-bib">Вы пока не процитировали ни одну статью в этом тексте.</div>
+            </div>
           </div>
         </div>
 
@@ -100,7 +110,14 @@
         </div>
 
         <div v-if="isSplitView" class="reader-pane" :style="{ width: (100 - editorWidth) + '%' }">
-          <div v-if="selectedPdfPath" class="pdf-container">
+          <div class="reader-toolbar">
+            <span class="opened-pdf-title">📋 {{ currentViewingArticleTitle }}</span>
+            <button @click="insertCitationFromActiveView" class="inline-cite-btn">
+              ➕ Цитировать в текст
+            </button>
+          </div>
+          
+          <div class="pdf-container">
             <iframe 
               :src="`https://articles-app.ru/${selectedPdfPath}`" 
               width="100%" 
@@ -132,52 +149,57 @@ const draftTitle = ref('');
 const draftContent = ref('');
 const serverDraftId = ref(null);
 
+// Состояние Split View
 const isSplitView = ref(false);
 const selectedPdfPath = ref('');
+const currentViewingArticleId = ref(null);
+const currentViewingArticleTitle = ref('');
 
-// --- ЛОГИКА УМНОГО ПОИСКА И ЦИТИРОВАНИЯ ---
+// Управление отображением библиографии
+const isBibliographyOpen = ref(false); // По умолчанию свернута!
+
+// Логика умного поиска статей для ридера
 const searchQuery = ref('');
 const isDropdownOpen = ref(false);
 
-// Фильтруем статьи по поисковому запросу
+const availablePdfArticles = computed(() => {
+  return articlesStore.list.filter(article => article.pdf_path);
+});
+
 const filteredArticles = computed(() => {
   const query = searchQuery.value.toLowerCase();
-  if (!query) return articlesStore.list;
-  return articlesStore.list.filter(a => 
+  if (!query) return availablePdfArticles.value;
+  return availablePdfArticles.value.filter(a => 
     a.title.toLowerCase().includes(query) || 
     (a.journal && a.journal.toLowerCase().includes(query)) ||
     (a.year && a.year.toString().includes(query))
   );
 });
 
-const handleArticleSelect = (article) => {
+// Клик по результату поиска просто подготавливает статью (как раньше)
+const selectArticleForView = (article) => {
+  selectedPdfPath.value = article.pdf_path;
+  currentViewingArticleId.value = article.id;
+  currentViewingArticleTitle.value = article.title;
   searchQuery.value = article.title;
+  isDropdownOpen.value = false;
 };
 
-// Функция вставки ссылки-маркера в текст
-const insertCitation = async (article) => {
+// КНОПКА ЦИТИРОВАНИЯ ВНУТРИ СТАТЬИ
+const insertCitationFromActiveView = async () => {
+  if (!currentViewingArticleId.value) return;
+  
   const citationNumber = draftsStore.citations.length + 1;
   const marker = ``;
   
-  // Сохраняем связь в базу данных
-  await draftsStore.addDraftCitation(serverDraftId.value, article.id, marker);
+  // Сохраняем в БД связь
+  await draftsStore.addDraftCitation(serverDraftId.value, currentViewingArticleId.value, marker);
   
-  // Добавляем маркер в текст
+  // Вставляем маркер в черновик
   draftContent.value += ` ${marker} `;
-  isDropdownOpen.value = false;
-  searchQuery.value = '';
-};
-
-// ИСПРАВЛЕННАЯ ФУНКЦИЯ: Теперь гарантированно активирует Split View и передает путь к PDF
-const openInSplitView = (article) => {
-  if (!article.pdf_path) {
-    alert("У этой статьи нет загруженного PDF-файла!");
-    return;
-  }
-  selectedPdfPath.value = article.pdf_path;
-  searchQuery.value = article.title;
-  isSplitView.value = true; // Принудительно включаем разделение экрана
-  isDropdownOpen.value = false;
+  
+  // Автоматически открываем нижнюю панель, чтобы зафиксировать появление источника
+  isBibliographyOpen.value = true;
 };
 
 const getArticleTitleById = (id) => {
@@ -185,37 +207,27 @@ const getArticleTitleById = (id) => {
   return art ? art.title : 'Неизвестный источник';
 };
 
-// Функция автоматической сборки списка литературы APA
 const generateBibliography = async () => {
-  if (draftsStore.citations.length === 0) {
-    alert("Нет цитируемых источников для сборки списка!");
-    return;
-  }
-  
+  if (draftsStore.citations.length === 0) return;
   let bibSection = "\n\n## Список литературы / References\n\n";
-  
   try {
     for (const citation of draftsStore.citations) {
       const res = await api.get(`/articles/${citation.article_id}/apa`);
-      bibSection += `* {res.data.citation}\n`;
+      bibSection += `* ${res.data.citation}\n`;
     }
-    
     draftContent.value += bibSection;
-    alert("✨ Список литературы по стандарту APA успешно сгенерирован и добавлен в конец статьи!");
+    alert("✨ Список литературы APA добавлен в конец черновика!");
     await handleSave();
   } catch (error) {
     alert("Ошибка при сборке библиографии");
   }
 };
 
-// Увеличили задержку закрытия списка до 300мс, чтобы клик (mousedown) по кнопкам "Цитата" и "Просмотр" успевал сработать
 const hideDropdown = () => {
-  setTimeout(() => { 
-    isDropdownOpen.value = false; 
-  }, 300);
+  setTimeout(() => { isDropdownOpen.value = false; }, 200);
 };
 
-// --- ЛОГИКА ИЗМЕНЕНИЯ РАЗМЕРА ОКОН (DRAG) ---
+// --- ЛОГИКА ИЗМЕНЕНИЯ РАЗМЕРА ОКОН ---
 const workspaceRef = ref(null);
 const editorWidth = ref(50);
 const isDragging = ref(false);
@@ -236,17 +248,17 @@ const toggleSplitView = () => {
   isSplitView.value = !isSplitView.value;
   if (!isSplitView.value) {
     selectedPdfPath.value = ''; 
+    currentViewingArticleId.value = null;
+    currentViewingArticleTitle.value = '';
     searchQuery.value = '';
     editorWidth.value = 50; 
   }
 };
 
-// Синхронизация данных драфта при открытии вкладки
 onMounted(async () => {
   if (articlesStore.list.length === 0) {
     articlesStore.fetchArticles();
   }
-
   const activeTabId = tabsStore.activeTabId;
   if (activeTabId && activeTabId.startsWith('draft-')) {
     const projectId = activeTabId.split('-')[1];
@@ -277,16 +289,11 @@ const handleSave = async () => {
 .title-input { width: 30%; font-size: 1.5em; padding: 5px; border: none; outline: none; background: transparent; font-weight: bold; color: #2c3e50; }
 .controls { display: flex; gap: 10px; align-items: center; }
 
-.searchable-select { position: relative; width: 400px; }
+.searchable-select { position: relative; width: 350px; }
 .article-search-input { width: 100%; padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc; outline: none; }
 .dropdown-list { position: absolute; top: 100%; left: 0; width: 100%; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #ccc; margin: 0; padding: 0; list-style: none; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-.dropdown-item { padding: 10px 12px; border-bottom: 1px solid #eee; }
-.dropdown-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.title-text { font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
-.item-actions { display: flex; gap: 5px; }
-
-.cite-action-btn { background: #2ecc71; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.85em; }
-.view-action-btn { background: #3498db; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-size: 0.85em; }
+.dropdown-item { padding: 10px 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+.dropdown-item:hover { background: #f8f9fa; }
 
 .split-btn { padding: 8px 15px; background: #ecf0f1; color: #2c3e50; border: 1px solid #bdc3c7; border-radius: 4px; cursor: pointer; font-weight: bold; }
 .split-btn.active { background: #34495e; color: white; }
@@ -297,21 +304,32 @@ const handleSave = async () => {
 .workspace.is-dragging { user-select: none; }
 .workspace.is-dragging iframe { pointer-events: none; }
 
-.editor-pane { display: flex; flex-direction: column; height: 100%; transition: width 0.1s; }
-.md-editor-custom { flex-grow: 1; min-height: 60% !important; }
+.editor-pane { display: flex; flex-direction: column; height: 100%; transition: width 0.1s; background: white; }
+.editor-container { width: 100%; transition: height 0.2s ease; }
+.md-editor-custom { height: 100% !important; }
 
-/* ПАНЕЛЬ БИБЛИОГРАФИИ */
-.bibliography-panel { background: #f8f9fa; border-top: 2px solid #ddd; padding: 15px 20px; overflow-y: auto; height: 35%; }
-.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+/* УЛУЧШЕННАЯ СВОРАЧИВАЕМАЯ ПАНЕЛЬ ЛИТЕРАТУРЫ */
+.bibliography-panel { background: #f8f9fa; border-top: 2px solid #ddd; display: flex; flex-direction: column; height: 35%; transition: height 0.2s ease; }
+.bibliography-panel.is-collapsed { height: 45px; overflow: hidden; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: #f1f2f6; cursor: pointer; user-select: none; border-bottom: 1px solid #ddd; }
+.panel-title-wrapper { display: flex; align-items: center; gap: 10px; }
 .panel-header h4 { margin: 0; color: #2c3e50; }
-.gen-bib-btn { background: #9b59b6; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+.arrow-icon { font-size: 0.8em; color: #7f8c8d; transition: transform 0.2s; }
+.gen-bib-btn { background: #9b59b6; color: white; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em; }
+.panel-content { padding: 15px 20px; overflow-y: auto; flex-grow: 1; }
 .citation-links-list { padding-left: 20px; margin: 0; }
 .citation-link-item { margin-bottom: 6px; font-size: 0.95em; }
 .marker-badge { background: #e67e22; color: white; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-family: monospace; }
-.empty-bib { color: #7f8c8d; font-size: 0.9em; text-align: center; margin-top: 15px; }
+.empty-bib { color: #7f8c8d; font-size: 0.9em; text-align: center; margin-top: 10px; }
 
 .divider { width: 10px; background-color: #f1f2f6; cursor: col-resize; display: flex; justify-content: center; align-items: center; z-index: 10; border-left: 1px solid #dfe4ea; border-right: 1px solid #dfe4ea; }
 .divider-handle { height: 30px; width: 4px; background-color: #a4b0be; border-radius: 2px; }
+
+/* ПАНЕЛЬ ЧИТАЛКИ И ВНУТРЕННИЙ ТУЛБАР */
 .reader-pane { height: 100%; background: #ecf0f1; display: flex; flex-direction: column; }
-.pdf-container { flex-grow: 1; width: 100%; height: 100%; }
+.reader-toolbar { background: #fff; padding: 8px 15px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+.opened-pdf-title { font-weight: bold; font-size: 0.9em; color: #34495e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65%; }
+.inline-cite-btn { background: #2ecc71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em; box-shadow: 0 2px 4px rgba(46,204,113,0.2); transition: 0.2s; }
+.inline-cite-btn:hover { background: #27ae60; }
+.pdf-container { flex-grow: 1; width: 100%; height: calc(100% - 40px); }
 </style>
