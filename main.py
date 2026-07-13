@@ -177,6 +177,22 @@ def delete_tag(tag_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Тег успешно удален из системы"}
 
+# Эндпоинт: Отвязать тег от конкретной статьи (удалить связь, но сохранить сам тег в справочнике)
+@app.delete("/articles/{article_id}/tags/{tag_id}")
+def remove_tag_from_article(article_id: int, tag_id: int, db: Session = Depends(get_db)):
+    article = db.query(models.Article).filter(models.Article.id == article_id).first()
+    tag = db.query(models.Tag).filter(models.Tag.id == tag_id).first()
+    
+    if not article or not tag:
+        raise HTTPException(status_code=404, detail="Статья или тег не найдены")
+    
+    # Если тег привязан к статье, удаляем его из списка связей
+    if tag in article.tags:
+        article.tags.remove(tag)
+        db.commit()
+        
+    return {"message": "Тег успешно отвязан от статьи"}
+
 # Эндпоинт: Получить список всех тегов
 @app.get("/tags/", response_model=list[schemas.TagResponse])
 def get_tags(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
