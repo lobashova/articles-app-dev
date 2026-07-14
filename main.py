@@ -502,3 +502,31 @@ def get_article_apa(article_id: int, db: Session = Depends(get_db)):
     citation = re.sub(' +', ' ', citation)
     
     return {"citation": citation.strip()}
+
+# Эндпоинт: Сгенерировать внутритекстовую цитату (Author, Year)
+@app.get("/articles/{article_id}/apa-in-text")
+def get_article_apa_in_text(article_id: int, db: Session = Depends(get_db)):
+    article = db.query(models.Article).filter(models.Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Статья не найдена")
+
+    links = db.query(models.ArticleAuthor).filter(models.ArticleAuthor.article_id == article_id).order_by(models.ArticleAuthor.order_index).all()
+    
+    authors = []
+    for link in links:
+        author = db.query(models.Author).filter(models.Author.id == link.author_id).first()
+        if author:
+            authors.append(author.last_name)
+
+    year_str = str(article.year) if article.year else "н.д."
+
+    if not authors:
+        author_str = "Автор неизвестен"
+    elif len(authors) == 1:
+        author_str = authors[0]
+    elif len(authors) == 2:
+        author_str = f"{authors[0]} & {authors[1]}"
+    else:
+        author_str = f"{authors[0]} et al." # APA стандарт для 3+ авторов
+
+    return {"in_text": f"({author_str}, {year_str})"}

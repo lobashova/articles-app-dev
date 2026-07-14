@@ -192,15 +192,46 @@ const selectArticleForView = (article) => {
   isDropdownOpen.value = false;
 };
 
+// КНОПКА ЦИТИРОВАНИЯ ВНУТРИ СТАТЬИ (С УМНОЙ ВСТАВКОЙ ПО КУРСОРУ)
 const insertCitationFromActiveView = async () => {
   if (!currentViewingArticleId.value) return;
   
-  const citationNumber = draftsStore.citations.length + 1;
-  const marker = ``;
-  
-  await draftsStore.addDraftCitation(serverDraftId.value, currentViewingArticleId.value, marker);
-  draftContent.value += ` ${marker} `;
-  isBibliographyOpen.value = true;
+  try {
+    // 1. Запрашиваем короткий APA-маркер с бэкенда (например, "(Smith, 2023)")
+    const res = await api.get(`/articles/${currentViewingArticleId.value}/apa-in-text`);
+    const marker = res.data.in_text;
+    
+    // 2. Сохраняем в БД связь между драфтом и статьей
+    await draftsStore.addDraftCitation(serverDraftId.value, currentViewingArticleId.value, marker);
+    
+    // 3. Ищем текстовое поле редактора на странице
+    const textarea = document.querySelector('.md-editor-custom textarea');
+    
+    if (textarea) {
+      // Запоминаем позицию курсора
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      
+      // Разрезаем текст на "до курсора" и "после курсора", вставляя маркер между ними
+      draftContent.value = draftContent.value.substring(0, start) + ` ${marker} ` + draftContent.value.substring(end);
+      
+      // Небольшой таймаут, чтобы Vue успел обновить DOM, возвращаем фокус на курсор
+      setTimeout(() => {
+        textarea.focus();
+        // Сдвигаем курсор в конец вставленной цитаты
+        textarea.selectionStart = textarea.selectionEnd = start + marker.length + 2; 
+      }, 50);
+    } else {
+      // Запасной вариант (fallback), если курсор не найден
+      draftContent.value += ` ${marker} `;
+    }
+    
+    // Разворачиваем нижнюю панель
+    isBibliographyOpen.value = true;
+  } catch (error) {
+    alert("Не удалось сгенерировать внутритекстовую цитату. Убедитесь, что сервер обновлен.");
+    console.error(error);
+  }
 };
 
 const getArticleTitleById = (id) => {
