@@ -14,18 +14,18 @@
         />
         
         <div class="controls">
+          
           <div class="searchable-select">
-          <button @click="downloadDraft" class="export-btn" title="Скачать файл на компьютер">
-            ⬇️ Скачать
-          </button>
+            <button @click="downloadDraft" class="export-btn" title="Скачать файл на компьютер">
+              ⬇️ Скачать
+            </button>
 
-          <button 
-            @click="toggleSplitView" 
-            :class="['split-btn', { active: isSplitView }]"
-            :disabled="!selectedPdfPath"
-          >
-          </button>
-          <div class="searchable-select">
+            <button 
+              @click="toggleSplitView" 
+              :class="['split-btn', { active: isSplitView }]"
+              :disabled="!selectedPdfPath"
+            >
+            </button>
             <input 
               v-model="searchQuery"
               @focus="isDropdownOpen = true"
