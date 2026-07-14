@@ -15,6 +15,17 @@
         
         <div class="controls">
           <div class="searchable-select">
+          <button @click="downloadDraft" class="export-btn" title="Скачать файл на компьютер">
+            ⬇️ Скачать
+          </button>
+
+          <button 
+            @click="toggleSplitView" 
+            :class="['split-btn', { active: isSplitView }]"
+            :disabled="!selectedPdfPath"
+          >
+          </button>
+          <div class="searchable-select">
             <input 
               v-model="searchQuery"
               @focus="isDropdownOpen = true"
@@ -312,6 +323,33 @@ const handleSave = async () => {
     }
   }
 };
+
+// --- ЭКСПОРТ ЧЕРНОВИКА (СКАЧИВАНИЕ ФАЙЛА) ---
+const downloadDraft = () => {
+  if (!draftContent.value) {
+    alert("Черновик пуст! Нечего скачивать.");
+    return;
+  }
+
+  // Создаем "виртуальный" файл из текста
+  const blob = new Blob([draftContent.value], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  
+  // Создаем невидимую ссылку и "кликаем" по ней
+  const a = document.createElement('a');
+  a.href = url;
+  
+  // Очищаем название от спецсимволов для безопасного имени файла
+  const safeTitle = (draftTitle.value || 'draft').replace(/[^a-z0-9а-яё]/gi, '_').toLowerCase();
+  a.download = `${safeTitle}.md`; // Формат файла
+  
+  document.body.appendChild(a);
+  a.click();
+  
+  // Убираем за собой
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 </script>
 
 <style scoped>
@@ -390,4 +428,18 @@ const handleSave = async () => {
 .inline-cite-btn { background: #2ecc71; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em; box-shadow: 0 2px 4px rgba(46,204,113,0.2); transition: 0.2s; }
 .inline-cite-btn:hover { background: #27ae60; }
 .pdf-container { flex-grow: 1; width: 100%; height: calc(100% - 40px); }
+.export-btn { 
+  padding: 8px 15px; 
+  background: #34495e; 
+  color: white; 
+  border: none; 
+  border-radius: 4px; 
+  cursor: pointer; 
+  font-weight: bold; 
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+.export-btn:hover {
+  background: #2c3e50;
+}
 </style>
