@@ -23,7 +23,7 @@ export const useAuthorsStore = defineStore('authors', {
         console.error('Ошибка при создании автора:', error);
         throw error;
       }
-    }
+    },
     // --- НОВЫЕ МЕТОДЫ: Редактирование и удаление авторов ---
     async updateAuthor(authorId, last_name, initials) {
       try {
