@@ -1,4 +1,4 @@
-<template>
+<!-- <template>
   <div class="articles-container">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
       <h2>📚 База статей</h2>
@@ -334,4 +334,87 @@ onMounted(() => {
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
 .save-btn { background: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
 .cancel-btn { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
-</style>
+</style> -->
+
+<template>
+  <div class="articles-container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <h2>📚 База источников</h2>
+      <button 
+        @click="openCreateTab"
+        style="padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;"
+      >
+        + Добавить статью
+      </button>
+    </div>
+
+    <div v-if="articlesStore.isLoading">Загрузка базы...</div>
+    
+    <ul v-else-if="articlesStore.list.length > 0" style="list-style: none; padding: 0;">
+      <li 
+        v-for="article in articlesStore.list" 
+        :key="article.id" 
+        style="background: white; border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;"
+      >
+        <div>
+          <h4 style="margin: 0 0 5px 0; color: #2c3e50;">{{ article.title }}</h4>
+          <p style="margin: 0; font-size: 0.9em; color: #7f8c8d;">
+            <span style="background: #eee; padding: 2px 6px; border-radius: 4px; margin-right: 10px; font-weight: bold;">{{ article.type }}</span>
+            Год: {{ article.year || '—' }} | Журнал: {{ article.journal || '—' }}
+          </p>
+        </div>
+        
+        <div style="display: flex; gap: 8px;">
+          <button 
+            @click="openArticleTab(article)"
+            style="padding: 8px 16px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
+          >
+            Открыть и анализировать
+          </button>
+          
+          <button 
+            @click="articlesStore.deleteArticle(article.id)"
+            style="padding: 8px 16px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;"
+          >
+            Удалить
+          </button>
+        </div>
+      </li>
+    </ul>
+    
+    <div v-else class="empty-state">
+      В вашей базе пока нет статей. Создайте первый источник!
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { onMounted } from 'vue';
+import { useArticlesStore } from '../stores/articles';
+import { useTabsStore } from '../stores/tabs';
+
+const articlesStore = useArticlesStore();
+const tabsStore = useTabsStore();
+
+// Открытие вкладки для создания новой статьи
+const openCreateTab = () => {
+  tabsStore.openTab({
+    id: 'viewer-new',
+    title: '➕ Новая статья',
+    componentName: 'ArticleViewer'
+  });
+};
+
+// Открытие существующей статьи
+const openArticleTab = (article) => {
+  tabsStore.openTab({
+    id: 'viewer-' + article.id,
+    title: '📖 ' + (article.title ? article.title.substring(0, 15) + '...' : 'Статья'),
+    componentName: 'ArticleViewer'
+  });
+};
+
+onMounted(() => {
+  articlesStore.fetchArticles();
+});
+</script>

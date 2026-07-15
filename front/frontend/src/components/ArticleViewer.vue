@@ -1,4 +1,4 @@
-<!-- <template>
+<!-- <!-- <template>
   <div class="viewer-wrapper">
     <div class="pdf-pane">
       <div v-if="pdfPath" class="pdf-container">
@@ -303,7 +303,7 @@ const saveNotes = async () => {
 }
 </style> -->
 
-<template>
+<!-- <template>
   <div class="viewer-wrapper">
     <div class="pdf-pane">
       <div v-if="pdfPath" class="pdf-container">
@@ -820,5 +820,436 @@ const copyApaCitation = async () => {
 }
 .apa-btn:hover {
   background: #e67e22;
-}
-</style> 
+} 
+</style>  -->
+
+<template>
+  <div class="viewer-wrapper">
+    <div class="pdf-pane">
+      <div v-if="articleData.pdf_path" class="pdf-container">
+        <iframe 
+          :src="`https://articles-app.ru/${articleData.pdf_path}`" 
+          width="100%" 
+          height="100%" 
+          frameborder="0"
+        ></iframe>
+      </div>
+      
+      <div v-else class="upload-zone">
+        <div class="upload-card">
+          <span style="font-size: 3em;">📁</span>
+          <h4>Загрузите PDF-файл статьи</h4>
+          <p>Система автоматически откроет его и попытается извлечь метаданные</p>
+          <input type="file" accept=".pdf" @change="handleFileUpload" class="file-input-hidden" id="pdf-initializer" />
+          <label for="pdf-initializer" class="upload-label-btn">
+            {{ isUploading ? '⏳ Анализируем PDF...' : 'Выбрать файл' }}
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-pane">
+      <div class="info-header">
+        <h3>{{ isNewMode ? '✨ Добавление источника' : '📝 Анализ статьи' }}</h3>
+        <button @click="saveEverything" class="save-btn" :disabled="isSaving">
+          {{ isSaving ? '⏳ Сохранение...' : '💾 Сохранить всё' }}
+        </button>
+      </div>
+
+      <div class="accordion-container">
+        
+        <div class="accordion-section">
+          <div class="accordion-header" @click="isMetadataOpen = !isMetadataOpen">
+            <span>📋 Метаданные статьи</span>
+            <span>{{ isMetadataOpen ? '▼' : '▲' }}</span>
+          </div>
+          
+          <div v-if="isMetadataOpen" class="accordion-content">
+            <div class="form-row">
+              <div class="form-group half">
+                <label>Тип источника *</label>
+                <select v-model="articleData.type" required>
+                  <option value="Journal Article">Журнальная статья</option>
+                  <option value="Book">Книга</option>
+                  <option value="Conference Paper">Материалы конференции</option>
+                  <option value="Website">Веб-сайт</option>
+                </select>
+              </div>
+              <div class="form-group half">
+                <label>Год издания *</label>
+                <input v-model="articleData.year" type="number" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Название статьи/книги *</label>
+              <input v-model="articleData.title" type="text" required placeholder="Введите название..." />
+            </div>
+
+            <div class="authors-sub-block">
+              <label style="font-weight: bold; font-size: 0.85em; display: block; margin-bottom: 5px;">👥 Авторы (в порядке цитирования)</label>
+              <div class="authors-badge-list">
+                <span v-for="(auth, idx) in articleData.authors" :key="idx" class="author-mini-badge">
+                  {{ auth.last_name }} {{ auth.initials }}
+                  <span @click="articleData.authors.splice(idx, 1)" style="cursor:pointer; font-weight:bold; margin-left:5px;">×</span>
+                </span>
+              </div>
+              <div class="form-row" style="margin-top: 5px; gap: 5px;">
+                <select v-model="selectedAuthor" class="half" style="padding:4px;">
+                  <option :value="null">-- Из справочника --</option>
+                  <option v-for="a in authorsStore.list" :key="a.id" :value="a">{{ a.last_name }} {{ a.initials }}</option>
+                </select>
+                <button @click.prevent="addExistingAuthor" class="author-add-btn">Добавить</button>
+              </div>
+              <div class="form-row" style="margin-top: 5px; gap: 5px;">
+                <input v-model="newAuthorForm.last_name" placeholder="Фамилия" class="quarter" style="padding:4px;" />
+                <input v-model="newAuthorForm.initials" placeholder="И. О." class="quarter" style="padding:4px;" />
+                <button @click.prevent="createNewAuthor" class="author-add-btn">Создать</button>
+              </div>
+            </div>
+
+            <div v-if="articleData.type === 'Journal Article'" class="fields-highlight">
+              <div class="form-row">
+                <div class="form-group half"><label>Журнал</label><input v-model="articleData.journal" type="text" /></div>
+                <div class="form-group quarter"><label>Выпуск</label><input v-model="articleData.issue" type="text" /></div>
+                <div class="form-group quarter"><label>Страницы</label><input v-model="articleData.pages" type="text" /></div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group half"><label>DOI</label><input v-model="articleData.doi" type="text" /></div>
+              <div class="form-group half"><label>Web Ссылка</label><input v-model="articleData.web_link" type="url" /></div>
+            </div>
+            <div class="form-group">
+              <label>Аннотация (Abstract)</label>
+              <textarea v-model="articleData.abstract" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-section">
+          <div class="accordion-header" @click="isInfoOpen = !isInfoOpen">
+            <span>📝 Информация о статье и теги</span>
+            <span>{{ isInfoOpen ? '▼' : '▲' }}</span>
+          </div>
+          
+          <div v-if="isInfoOpen" class="accordion-content">
+            <div class="form-group">
+              <label>🏷 Теги статьи</label>
+              <div class="tags-list" style="margin-bottom: 8px;">
+                <span v-for="tag in articleTags" :key="tag.id" class="tag-badge" :style="{ backgroundColor: tag.color }">
+                  {{ tag.name }} <span @click.stop="removeTagFromArticle(tag.id)" style="cursor:pointer; margin-left:4px;">×</span>
+                </span>
+              </div>
+              <div class="tag-input-wrapper">
+                <input v-model="newTagName" @focus="isTagDropdownOpen = true" placeholder="Поиск/создание тега..." class="search-input" />
+                <ul v-if="isTagDropdownOpen && newTagName" class="tag-dropdown">
+                  <li v-for="t in filteredTags" :key="t.id" @mousedown="addTagToArticle(t)" class="dropdown-item">
+                    <span class="color-dot" :style="{ background: t.color }"></span> {{ t.name }}
+                  </li>
+                  <li v-if="!filteredTags.length" @mousedown="createAndAddTag" class="dropdown-item create-new">
+                    + Создать тег "{{ newTagName }}"
+                  </li>
+                </ul>
+                <input type="color" v-model="newTagColor" class="color-picker" title="Цвет тега">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>🎯 Цели исследования (Aims)</label>
+              <textarea v-model="notes.aims" rows="3" placeholder="Какую проблему решает автор?..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>🛠 Методы (Methods)</label>
+              <textarea v-model="notes.methods" rows="3" placeholder="Алгоритмы, выборка, данные..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>📊 Главные результаты (Results)</label>
+              <textarea v-model="notes.results" rows="3" placeholder="Ключевые выводы..."></textarea>
+            </div>
+            <div class="form-group">
+              <label>💡 Мои комментарии и идеи</label>
+              <textarea v-model="notes.comments" rows="3" placeholder="Как это использовать в проекте?..."></textarea>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed, watch } from 'vue';
+import api from '../api';
+import { useTabsStore } from '../stores/tabs';
+import { useArticlesStore } from '../stores/articles';
+import { useAuthorsStore } from '../stores/authors';
+import { useTagsStore } from '../stores/tags';
+
+const tabsStore = useTabsStore();
+const articlesStore = useArticlesStore();
+const authorsStore = useAuthorsStore();
+const tagsStore = useTagsStore();
+
+const articleId = ref(null);
+const isSaving = ref(false);
+const isUploading = ref(false);
+
+// Состояния раскрытия блоков (По умолчанию метаданные открыты, инфо закрыта)
+const isMetadataOpen = ref(true);
+const isInfoOpen = ref(false);
+
+// Режим создания новой статьи
+const isNewMode = computed(() => articleId.value === 'new' || !articleId.value);
+
+// Единое реактивное состояние метаданных статьи
+const defaultArticleData = {
+  type: 'Journal Article', title: '', year: new Date().getFullYear(),
+  journal: '', issue: '', pages: '', edition: '', doi: '', web_link: '', abstract: '',
+  pdf_path: '', authors: []
+};
+const articleData = ref({ ...defaultArticleData });
+
+// Состояние авторов и тегов
+const selectedAuthor = ref(null);
+const newAuthorForm = ref({ last_name: '', initials: '' });
+const selectedTag = ref(null);
+const newTagName = ref('');
+const newTagColor = ref('#3498db');
+const articleTags = ref([]);
+const isTagDropdownOpen = ref(false);
+
+// Заметки
+const notes = ref({ aims: '', methods: '', results: '', comments: '' });
+const noteIds = ref({ aims: null, methods: null, results: null, comments: null });
+
+// Умная фильтрация тегов
+const filteredTags = computed(() => {
+  return tagsStore.list.filter(t => t.name.toLowerCase().includes(newTagName.value.toLowerCase()));
+});
+
+// Загрузка/инициализация компонента
+const initViewer = async () => {
+  const activeTabId = tabsStore.activeTabId;
+  if (!activeTabId || !activeTabId.startsWith('viewer-')) return;
+  
+  const rawId = activeTabId.split('-')[1];
+  
+  if (rawId === 'new') {
+    articleId.value = 'new';
+    articleData.value = { ...defaultArticleData, authors: [] };
+    articleTags.value = [];
+    notes.value = { aims: '', methods: '', results: '', comments: '' };
+    noteIds.value = { aims: null, methods: null, results: null, comments: null };
+  } else {
+    articleId.value = parseInt(rawId);
+    
+    // Убедимся, что база статей загружена, если зашли по прямой ссылке
+    if (articlesStore.list.length === 0) {
+      await articlesStore.fetchArticles();
+    }
+    
+    const matched = articlesStore.list.find(a => a.id === articleId.value);
+    if (matched) {
+      articleData.value = { ...matched, authors: [] };
+      // Качаем привязанных авторов
+      const authRes = await api.get(`/articles/${articleId.value}/authors/`);
+      articleData.value.authors = authRes.data;
+    }
+    
+    // Качаем заметки и теги
+    loadNotesAndTags();
+  }
+};
+
+const loadNotesAndTags = async () => {
+  if (isNewMode.value) return;
+  try {
+    const response = await api.get(`/articles/${articleId.value}/notes/`);
+    response.data.forEach(note => {
+      if (notes.value[note.field_type] !== undefined) {
+        notes.value[note.field_type] = note.content;
+        noteIds.value[note.field_type] = note.id;
+      }
+    });
+    const tagsRes = await api.get(`/articles/${articleId.value}/tags/`);
+    articleTags.value = tagsRes.data;
+  } catch (e) { console.error(e); }
+};
+
+// Загрузка PDF файла прямо во вкладке
+const handleFileUpload = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  isUploading.value = true;
+  try {
+    const uploadResult = await articlesStore.uploadFile(file);
+    articleData.value.pdf_path = uploadResult.path;
+    
+    // Если бэкенд распарсил PDF, предзаполняем форму на лету
+    if (uploadResult.extracted_metadata) {
+      const meta = uploadResult.extracted_metadata;
+      if (meta.title) articleData.value.title = meta.title;
+      if (meta.year) articleData.value.year = meta.year;
+      if (meta.journal) articleData.value.journal = meta.journal;
+      if (meta.doi) articleData.value.doi = meta.doi;
+    }
+  } catch (error) {
+    alert("Ошибка загрузки файла.");
+  } finally { isUploading.value = false; }
+};
+
+// Логика управления авторами
+const addExistingAuthor = () => {
+  if (selectedAuthor.value && !articleData.value.authors.find(a => a.id === selectedAuthor.value.id)) {
+    articleData.value.authors.push(selectedAuthor.value);
+    selectedAuthor.value = null;
+  }
+};
+const createNewAuthor = async () => {
+  if (newAuthorForm.value.last_name && newAuthorForm.value.initials) {
+    const created = await authorsStore.createAuthor(newAuthorForm.value);
+    articleData.value.authors.push(created);
+    newAuthorForm.value = { last_name: '', initials: '' };
+  }
+};
+
+// Логика управления тегами
+const addTagToArticle = async (tag) => {
+  if (!tag) return;
+  if (articleTags.value.find(t => t.id === tag.id)) return;
+  
+  if (!isNewMode.value) {
+    await api.post(`/articles/${articleId.value}/tags/${tag.id}`);
+  }
+  articleTags.value.push(tag);
+  newTagName.value = '';
+  isTagDropdownOpen.value = false;
+};
+const createAndAddTag = async () => {
+  if (!newTagName.value) return;
+  const res = await api.post('/tags/', { name: newTagName.value, color: newTagColor.value });
+  tagsStore.list.push(res.data);
+  await addTagToArticle(res.data);
+};
+const removeTagFromArticle = async (tagId) => {
+  if (!isNewMode.value) {
+    await api.delete(`/articles/${articleId.value}/tags/${tagId}`);
+  }
+  articleTags.value = articleTags.value.filter(t => t.id !== tagId);
+};
+
+// --- ЕДИНАЯ ФУНКЦИЯ СОХРАНЕНИЯ ВСЕГО КОНТЕКСТА СТАТЬИ ---
+const saveEverything = async () => {
+  if (!articleData.value.title) {
+    alert("Заполните название статьи!");
+    return;
+  }
+  isSaving.value = true;
+  try {
+    let savedArticleId = articleId.value;
+    
+    // 1. Сохраняем/обновляем саму статью
+    if (isNewMode.value) {
+      const res = await api.post('/articles/', articleData.value);
+      savedArticleId = res.data.id;
+      articlesStore.list.unshift(res.data); // добавляем в общий список
+    } else {
+      await api.put(`/articles/${articleId.value}`, articleData.value);
+    }
+    
+    // 2. Синхронизируем авторов
+    const authorIds = articleData.value.authors.map(a => a.id);
+    await api.post(`/articles/${savedArticleId}/sync-authors/`, { author_ids: authorIds });
+    
+    // 3. Сохраняем теги (если это был режим создания, сохраняем накопленные теги в БД)
+    if (isNewMode.value) {
+      for (const tag of articleTags.value) {
+        await api.post(`/articles/${savedArticleId}/tags/${tag.id}`);
+      }
+    }
+    
+    // 4. Сохраняем заметки
+    for (const field of Object.keys(notes.value)) {
+      const content = notes.value[field];
+      const id = noteIds.value[field];
+      if (id) {
+        await api.put(`/notes/${id}`, { field_type: field, content: content });
+      } else if (content.trim() !== '') {
+        const res = await api.post(`/articles/${savedArticleId}/notes/`, { field_type: field, content: content });
+        noteIds.value[field] = res.data.id;
+      }
+    }
+    
+    // Если это была новая статья — трансформируем вкладку в обычный режим просмотра этой статьи
+    if (isNewMode.value) {
+      const currentTab = tabsStore.openTabs.find(t => t.id === 'viewer-new');
+      if (currentTab) {
+        currentTab.id = 'viewer-' + savedArticleId;
+        currentTab.title = '📖 ' + articleData.value.title.substring(0, 15) + '...';
+        tabsStore.activeTabId = 'viewer-' + savedArticleId;
+      }
+      articleId.value = savedArticleId;
+    }
+    
+    alert("✨ Всё успешно сохранено в базу данных!");
+  } catch (error) {
+    alert("Ошибка при комплексном сохранении.");
+  } finally { isSaving.value = false; }
+};
+
+watch(() => tabsStore.activeTabId, () => { initViewer(); });
+onMounted(() => {
+  authorsStore.fetchAuthors();
+  tagsStore.fetchTags();
+  initViewer();
+});
+</script>
+
+<style scoped>
+.viewer-wrapper { display: flex; height: calc(100vh - 120px); margin: -20px; background: #ecf0f1; }
+.pdf-pane { flex: 1; border-right: 2px solid #bdc3c7; display: flex; flex-direction: column; background: #dfe4ea; }
+.pdf-container { flex-grow: 1; width: 100%; }
+
+/* Стильная зона загрузки вместо пустого iframe */
+.upload-zone { display: flex; justify-content: center; align-items: center; height: 100%; }
+.upload-card { background: white; padding: 40px; border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 400px; }
+.file-input-hidden { display: none; }
+.upload-label-btn { display: inline-block; padding: 10px 20px; background: #3498db; color: white; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 15px; }
+
+.info-pane { width: 450px; background: #fff; display: flex; flex-direction: column; box-shadow: -2px 0 10px rgba(0,0,0,0.05); }
+.info-header { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fdfdfd; }
+.save-btn { background: #2ecc71; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+.save-btn:disabled { background: #95a5a6; }
+
+/* АККОРДЕОНЫ */
+.accordion-container { overflow-y: auto; flex-grow: 1; }
+.accordion-section { border-bottom: 1px solid #eee; }
+.accordion-header { padding: 15px 20px; background: #f8f9fa; font-weight: bold; color: #2c3e50; cursor: pointer; display: flex; justify-content: space-between; }
+.accordion-header:hover { background: #f1f2f6; }
+.accordion-content { padding: 20px; background: white; }
+
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 0.85em; color: #34495e; }
+.form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+.form-row { display: flex; gap: 10px; }
+.half { flex: 1; }
+.quarter { flex: 0.5; }
+.fields-highlight { background: #f6f8fa; padding: 10px; border-radius: 4px; margin-bottom: 10px; border-left: 3px solid #3498db; }
+
+/* Авторы и теги */
+.authors-sub-block { background: #fff5e6; padding: 10px; border-radius: 4px; margin-bottom: 12px; border-left: 3px solid #f39c12; }
+.authors-badge-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.author-mini-badge { background: #f39c12; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; }
+.author-add-btn { padding: 4px 10px; background: #34495e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
+
+.tag-badge { color: white; padding: 4px 10px; border-radius: 15px; margin-right: 5px; display: inline-flex; align-items: center; font-size: 0.85em; font-weight: 500; }
+.tag-input-wrapper { display: flex; gap: 5px; position: relative; }
+.tag-dropdown { position: absolute; bottom: 100%; left: 0; width: 100%; background: white; border: 1px solid #eee; z-index: 10; padding: 0; margin: 0; list-style: none; box-shadow: 0 -4px 10px rgba(0,0,0,0.1); }
+.dropdown-item { padding: 8px; cursor: pointer; }
+.dropdown-item:hover { background: #f0f0f0; }
+.color-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.color-picker { width: 35px; height: 35px; border: none; cursor: pointer; background: none; padding: 0; }
+</style>
