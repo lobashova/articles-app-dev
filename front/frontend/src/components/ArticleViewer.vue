@@ -887,24 +887,50 @@ const copyApaCitation = async () => {
             </div>
 
             <div class="authors-sub-block">
-              <label style="font-weight: bold; font-size: 0.85em; display: block; margin-bottom: 5px;">👥 Авторы (в порядке цитирования)</label>
+              <label style="font-weight: bold; font-size: 0.85em; display: block; margin-bottom: 5px;">
+                👥 Авторы (в порядке цитирования)
+              </label>
+              
               <div class="authors-badge-list">
                 <span v-for="(auth, idx) in articleData.authors" :key="idx" class="author-mini-badge">
                   {{ auth.last_name }} {{ auth.initials }}
                   <span @click="articleData.authors.splice(idx, 1)" style="cursor:pointer; font-weight:bold; margin-left:5px;">×</span>
                 </span>
               </div>
-              <div class="form-row" style="margin-top: 5px; gap: 5px;">
-                <select v-model="selectedAuthor" class="half" style="padding:4px;">
-                  <option :value="null">-- Из справочника --</option>
-                  <option v-for="a in authorsStore.list" :key="a.id" :value="a">{{ a.last_name }} {{ a.initials }}</option>
-                </select>
-                <button @click.prevent="addExistingAuthor" class="author-add-btn">Добавить</button>
-              </div>
-              <div class="form-row" style="margin-top: 5px; gap: 5px;">
-                <input v-model="newAuthorForm.last_name" placeholder="Фамилия" class="quarter" style="padding:4px;" />
-                <input v-model="newAuthorForm.initials" placeholder="И. О." class="quarter" style="padding:4px;" />
-                <button @click.prevent="createNewAuthor" class="author-add-btn">Создать</button>
+
+              <div class="author-input-container" style="position: relative; margin-top: 8px;">
+                <div class="form-row" style="gap: 5px;">
+                  <input 
+                    v-model="authorSearchQuery" 
+                    @focus="isAuthorDropdownOpen = true"
+                    placeholder="Начните вводить фамилию..." 
+                    class="half"
+                    style="padding:6px; border: 1px solid #ccc; border-radius: 4px;"
+                  />
+                  <input 
+                    v-model="newAuthorForm.initials" 
+                    placeholder="И. О." 
+                    class="quarter" 
+                    style="padding:6px; border: 1px solid #ccc; border-radius: 4px;"
+                  />
+                  <button @click.prevent="handleCreateAndAddAuthor" class="author-add-btn">
+                    + Создать и добавить
+                  </button>
+                </div>
+
+                <ul v-if="isAuthorDropdownOpen && authorSearchQuery" class="author-dropdown">
+                  <li 
+                    v-for="a in filteredAuthors" 
+                    :key="a.id" 
+                    @mousedown="addExistingAuthor(a)"
+                    class="author-dropdown-item"
+                  >
+                    👤 {{ a.last_name }} {{ a.initials }}
+                  </li>
+                  <li v-if="filteredAuthors.length === 0" class="author-dropdown-item empty">
+                    В базе нет автора "{{ authorSearchQuery }}". Заполните "И.О." и нажмите Создать.
+                  </li>
+                </ul>
               </div>
             </div>
 
@@ -1013,6 +1039,8 @@ const articleData = ref({ ...defaultArticleData });
 
 // Состояние авторов и тегов
 const selectedAuthor = ref(null);
+const authorSearchQuery = ref('');
+const isAuthorDropdownOpen = ref(false);
 const newAuthorForm = ref({ last_name: '', initials: '' });
 const selectedTag = ref(null);
 const newTagName = ref('');
@@ -1101,20 +1129,56 @@ const handleFileUpload = async (event) => {
   } finally { isUploading.value = false; }
 };
 
-// Логика управления авторами
-const addExistingAuthor = () => {
-  if (selectedAuthor.value && !articleData.value.authors.find(a => a.id === selectedAuthor.value.id)) {
-    articleData.value.authors.push(selectedAuthor.value);
-    selectedAuthor.value = null;
+// Синхронизируем ввод фамилии с формой создания нового автора
+watch(authorSearchQuery, (newVal) => {
+  newAuthorForm.value.last_name = newVal;
+});
+
+// Фильтруем глобальный список авторов по введенным буквам
+const filteredAuthors = computed(() => {
+  if (!authorSearchQuery.value) return [];
+  return authorsStore.list.filter(a => 
+    a.last_name.toLowerCase().includes(authorSearchQuery.value.toLowerCase())
+  );
+});
+
+// Добавление автора, который УЖЕ есть в базе данных (клик из списка)
+const addExistingAuthor = (author) => {
+  if (!articleData.value.authors.find(a => a.id === author.id)) {
+    articleData.value.authors.push(author);
   }
+  // Сбрасываем поля ввода
+  authorSearchQuery.value = '';
+  newAuthorForm.value.initials = '';
+  isAuthorDropdownOpen.value = false;
 };
-const createNewAuthor = async () => {
-  if (newAuthorForm.value.last_name && newAuthorForm.value.initials) {
+
+// Создание АБСОЛЮТНО НОВОГО автора на сервере и добавление его к статье
+const handleCreateAndAddAuthor = async () => {
+  if (!newAuthorForm.value.last_name || !newAuthorForm.value.initials) {
+    alert("Заполните Фамилию и Инициалы для создания нового автора!");
+    return;
+  }
+  try {
     const created = await authorsStore.createAuthor(newAuthorForm.value);
     articleData.value.authors.push(created);
+    
+    // Очищаем поля
+    authorSearchQuery.value = '';
     newAuthorForm.value = { last_name: '', initials: '' };
+    isAuthorDropdownOpen.value = false;
+  } catch (error) {
+    alert("Ошибка при сохранении автора в справочник.");
   }
 };
+
+// const createNewAuthor = async () => {
+//   if (newAuthorForm.value.last_name && newAuthorForm.value.initials) {
+//     const created = await authorsStore.createAuthor(newAuthorForm.value);
+//     articleData.value.authors.push(created);
+//     newAuthorForm.value = { last_name: '', initials: '' };
+//   }
+// };
 
 // Логика управления тегами
 const addTagToArticle = async (tag) => {
@@ -1252,4 +1316,35 @@ onMounted(() => {
 .dropdown-item:hover { background: #f0f0f0; }
 .color-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
 .color-picker { width: 35px; height: 35px; border: none; cursor: pointer; background: none; padding: 0; }
+/* Стили для умного автокомплита авторов */
+.author-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  max-height: 180px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  z-index: 99;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  padding: 0;
+  margin: 2px 0 0 0;
+  list-style: none;
+}
+.author-dropdown-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.9em;
+  color: #2c3e50;
+}
+.author-dropdown-item:hover {
+  background-color: #3498db15;
+}
+.author-dropdown-item.empty {
+  color: #7f8c8d;
+  background: #fafafa;
+  cursor: default;
+}
 </style>
