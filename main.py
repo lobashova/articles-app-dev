@@ -533,7 +533,7 @@ def get_article_apa_in_text(article_id: int, db: Session = Depends(get_db)):
 
 # Эндпоинт: Умный глобальный поиск по всей базе
 @app.get("/search/")
-def global_search(q: str, db: Session = Depends(get_db)):
+def global_search(q: str = "", db: Session = Depends(get_db)): # <-- ИЗМЕНЕНИЕ ЗДЕСЬ
     if not q or len(q) < 2:
         return {"articles": [], "drafts": [], "tags": []}
 

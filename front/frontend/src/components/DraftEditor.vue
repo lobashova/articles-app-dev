@@ -79,6 +79,7 @@
               language="en-US" 
               :preview="false" 
               class="md-editor-custom"
+              editorId="main-draft-editor" 
             />
           </div>
           

@@ -10,7 +10,13 @@
           Открыть библиотеку
         </button>
       <div class="search-container">
-        <input type="text" placeholder="Умный поиск по базе..." class="global-search" />
+        <input 
+          type="text" 
+          placeholder="Умный поиск (Ctrl+K)..." 
+          class="global-search" 
+          @focus="openSearchModal"
+          readonly 
+        />
       </div>
     </header>
 
@@ -54,6 +60,11 @@ import ArticleViewer from './components/ArticleViewer.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
 
 const tabsStore = useTabsStore();
+
+// Выбрасываем глобальное событие, которое поймает компонент GlobalSearch.vue
+const openSearchModal = () => {
+  window.dispatchEvent(new Event('open-global-search'));
+};
 
 // Карта доступных компонентов
 const componentsMap = {

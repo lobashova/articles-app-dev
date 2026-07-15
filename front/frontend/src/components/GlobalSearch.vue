@@ -70,24 +70,34 @@ const isLoading = ref(false);
 const results = ref({ articles: [], drafts: [], tags: [] });
 let debounceTimer = null;
 
-// Слушатель горячих клавиш (Ctrl+K или Cmd+K)
+// Универсальная функция открытия модального окна поиска
+const handleCustomOpen = () => {
+  isOpen.value = true;
+  setTimeout(() => {
+    const input = document.getElementById('global-search-input');
+    if (input) input.focus();
+  }, 100);
+};
+
+// Слушатель горячих клавиш
 const handleKeydown = (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
-    isOpen.value = true;
-    setTimeout(() => {
-      const input = document.getElementById('global-search-input');
-      if (input) input.focus();
-    }, 100);
+    e.stopPropagation(); // Блокируем перехват от Markdown-редактора!
+    handleCustomOpen();
   }
 };
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeydown);
+  // Параметр { capture: true } заставляет браузер ловить событие ДО редактора
+  window.addEventListener('keydown', handleKeydown, { capture: true });
+  // Слушаем сигнал от верхней шапки сайта (App.vue)
+  window.addEventListener('open-global-search', handleCustomOpen);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown);
+  window.removeEventListener('keydown', handleKeydown, { capture: true });
+  window.removeEventListener('open-global-search', handleCustomOpen);
 });
 
 const closeSearch = () => {
@@ -96,7 +106,6 @@ const closeSearch = () => {
   results.value = { articles: [], drafts: [], tags: [] };
 };
 
-// Запрос на сервер с задержкой (чтобы не спамить API на каждую букву)
 const handleSearch = () => {
   clearTimeout(debounceTimer);
   if (query.value.length < 2) {
@@ -107,14 +116,15 @@ const handleSearch = () => {
   isLoading.value = true;
   debounceTimer = setTimeout(async () => {
     try {
-      const response = await api.get(`/search/?q=${query.value}`);
+      // ИСПРАВЛЕНИЕ 422 ОШИБКИ: передаем q через объект params
+      const response = await api.get('/search/', { params: { q: query.value } });
       results.value = response.data;
     } catch (error) {
       console.error("Ошибка поиска", error);
     } finally {
       isLoading.value = false;
     }
-  }, 300); // 300 мс задержки
+  }, 300);
 };
 
 const isEmpty = computed(() => {
@@ -123,23 +133,13 @@ const isEmpty = computed(() => {
          results.value.tags.length === 0;
 });
 
-// Открытие статьи во вьювере
 const openArticle = (art) => {
-  tabsStore.openTab({
-    id: 'viewer-' + art.id,
-    title: '📖 ' + art.title.substring(0, 15) + '...',
-    componentName: 'ArticleViewer'
-  });
+  tabsStore.openTab({ id: 'viewer-' + art.id, title: '📖 ' + art.title.substring(0, 15) + '...', componentName: 'ArticleViewer' });
   closeSearch();
 };
 
-// Открытие черновика
 const openDraft = (draft) => {
-  tabsStore.openTab({
-    id: 'draft-' + draft.project_id,
-    title: '📝 Драфт: ' + draft.title.substring(0, 15),
-    componentName: 'DraftEditor'
-  });
+  tabsStore.openTab({ id: 'draft-' + draft.project_id, title: '📝 Драфт: ' + draft.title.substring(0, 15), componentName: 'DraftEditor' });
   closeSearch();
 };
 </script>
