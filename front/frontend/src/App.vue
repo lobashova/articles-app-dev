@@ -1,5 +1,6 @@
 <template>
   <div class="app-layout">
+    <GlobalSearch />
     <header class="top-bar">
       <div class="logo">📚 Приложение для статей</div>
       <button 
@@ -50,6 +51,7 @@ import ProjectList from './components/ProjectList.vue';
 import DraftEditor from './components/DraftEditor.vue'; // 1. Проверьте наличие импорта!
 import ArticleList from './components/ArticleList.vue';
 import ArticleViewer from './components/ArticleViewer.vue';
+import GlobalSearch from './components/GlobalSearch.vue';
 
 const tabsStore = useTabsStore();
 

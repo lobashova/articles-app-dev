@@ -530,3 +530,38 @@ def get_article_apa_in_text(article_id: int, db: Session = Depends(get_db)):
         author_str = f"{authors[0]} et al." # APA стандарт для 3+ авторов
 
     return {"in_text": f"({author_str}, {year_str})"}
+
+# Эндпоинт: Умный глобальный поиск по всей базе
+@app.get("/search/")
+def global_search(q: str, db: Session = Depends(get_db)):
+    if not q or len(q) < 2:
+        return {"articles": [], "drafts": [], "tags": []}
+
+    search_pattern = f"%{q}%"
+
+    # 1. Ищем статьи (по названию или аннотации)
+    articles = db.query(models.Article).filter(
+        or_(
+            models.Article.title.ilike(search_pattern),
+            models.Article.abstract.ilike(search_pattern)
+        )
+    ).limit(5).all()
+
+    # 2. Ищем черновики (по названию или содержимому текста)
+    drafts = db.query(models.Draft).filter(
+        or_(
+            models.Draft.title.ilike(search_pattern),
+            models.Draft.content.ilike(search_pattern)
+        )
+    ).limit(5).all()
+
+    # 3. Ищем теги
+    tags = db.query(models.Tag).filter(
+        models.Tag.name.ilike(search_pattern)
+    ).limit(5).all()
+
+    return {
+        "articles": [{"id": a.id, "title": a.title, "year": a.year} for a in articles],
+        "drafts": [{"id": d.id, "title": d.title, "project_id": d.project_id} for d in drafts],
+        "tags": [{"id": t.id, "name": t.name, "color": t.color} for t in tags]
+    }
