@@ -567,3 +567,27 @@ def global_search(q: str, db: Session = Depends(get_db)):
         "drafts": [{"id": d.id, "title": d.title, "project_id": d.project_id} for d in drafts],
         "tags": [{"id": t.id, "name": t.name, "color": t.color} for t in tags]
     }
+
+# Эндпоинт: Редактировать автора в глобальном справочнике
+@app.put("/authors/{author_id}", response_model=schemas.AuthorResponse)
+def update_author(author_id: int, author_data: schemas.AuthorCreate, db: Session = Depends(get_db)):
+    db_author = db.query(models.Author).filter(models.Author.id == author_id).first()
+    if not db_author:
+        raise HTTPException(status_code=404, detail="Автор не найден")
+    
+    db_author.last_name = author_data.last_name
+    db_author.initials = author_data.initials
+    db.commit()
+    db.refresh(db_author)
+    return db_author
+
+# Эндпоинт: Полностью удалить автора из базы данных
+@app.delete("/authors/{author_id}")
+def delete_author(author_id: int, db: Session = Depends(get_db)):
+    db_author = db.query(models.Author).filter(models.Author.id == author_id).first()
+    if not db_author:
+        raise HTTPException(status_code=404, detail="Автор не найден")
+    
+    db.delete(db_author)
+    db.commit()
+    return {"message": "Автор успешно удален из системы"}
