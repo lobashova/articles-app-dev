@@ -116,8 +116,9 @@ const handleSearch = () => {
   isLoading.value = true;
   debounceTimer = setTimeout(async () => {
     try {
-      // ИСПРАВЛЕНИЕ 422 ОШИБКИ: передаем q через объект params
-      const response = await api.get('/search/', { params: { q: query.value } });
+      // ИСПРАВЛЕНИЕ: Передаем запрос прямо в путь URL с кодированием символов
+      const safeQuery = encodeURIComponent(query.value);
+      const response = await api.get(`/search/${safeQuery}`);
       results.value = response.data;
     } catch (error) {
       console.error("Ошибка поиска", error);

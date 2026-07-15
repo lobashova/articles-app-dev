@@ -78,8 +78,9 @@
               v-model="draftContent" 
               language="en-US" 
               :preview="false" 
+              editorId="main-draft-editor"
+              :scrollAuto="false"
               class="md-editor-custom"
-              editorId="main-draft-editor" 
             />
           </div>
           
