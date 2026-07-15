@@ -479,11 +479,11 @@ const hideAuthorDropdown = () => {
 .save-btn { background: #2ecc71; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
 .save-btn:disabled { background: #95a5a6; }
 
-.accordion-container { overflow-y: auto; flex-grow: 1; }
+/* .accordion-container { overflow-y: auto; flex-grow: 1; } */
 .accordion-section { border-bottom: 1px solid #eee; }
 .accordion-header { padding: 15px 20px; background: #f8f9fa; font-weight: bold; color: #2c3e50; cursor: pointer; display: flex; justify-content: space-between; user-select: none; }
 .accordion-header:hover { background: #f1f2f6; }
-.accordion-content { padding: 15px 20px; background: white; }
+/* .accordion-content { padding: 15px 20px; background: white; } */
 
 .form-group { margin-bottom: 12px; }
 .form-group label { display: block; margin-bottom: 4px; font-weight: bold; font-size: 0.85em; color: #34495e; }
@@ -532,17 +532,30 @@ const hideAuthorDropdown = () => {
   position: relative; 
   z-index: 100; /* Гарантирует, что список будет выше всех полей */
 }
+/* Исправляем контейнеры, чтобы они не обрезали dropdown */
+.accordion-container { 
+  overflow-y: visible; /* ИЗМЕНИЛИ auto на visible, чтобы список выходил за границы */
+  flex-grow: 1; 
+  padding-bottom: 200px; /* Добавили отступ снизу, чтобы было место для списка */
+}
 
+.accordion-content { 
+  padding: 15px 20px; 
+  background: white; 
+  overflow: visible; /* И здесь тоже */
+}
+
+/* Выпадающий список */
 .author-dropdown { 
   position: absolute; 
-  top: 100%; /* Список должен идти ПОД полем ввода, а не под низ */
+  top: 100%; 
   left: 0; 
   width: 100%; 
   background: white; 
   border: 1px solid #ccc; 
   border-radius: 4px; 
-  z-index: 999; /* Очень высокий приоритет */
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+  z-index: 9999; /* Максимальный приоритет */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3); 
   list-style: none;
   margin-top: 5px;
 }
