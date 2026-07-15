@@ -74,9 +74,13 @@ class NoteResponse(NoteBase):
         from_attributes = True
 
 # --- АВТОРЫ ---
+# Добавьте эти классы в schemas.py
 class AuthorBase(BaseModel):
     last_name: str
     initials: str
+
+class AuthorCreate(AuthorBase):
+    pass
 
 class AuthorResponse(AuthorBase):
     id: int
