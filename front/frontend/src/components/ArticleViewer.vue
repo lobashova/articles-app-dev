@@ -73,45 +73,48 @@
             </div>
 
             <div class="authors-sub-block">
-              <label class="block-sub-label">👥 Авторы (в порядке цитирования)</label>
+              <label style="font-weight: bold; font-size: 0.85em; display: block; margin-bottom: 5px;">
+                👥 Авторы (в порядке цитирования)
+              </label>
               
               <div class="authors-badge-list">
                 <span v-for="(auth, idx) in articleData.authors" :key="idx" class="author-mini-badge">
                   {{ auth.last_name }} {{ auth.initials }}
-                  <span @click="articleData.authors.splice(idx, 1)" class="remove-auth-x">×</span>
+                  <span @click="articleData.authors.splice(idx, 1)" style="cursor:pointer; font-weight:bold; margin-left:5px;">×</span>
                 </span>
               </div>
 
-              <div class="author-input-container">
-                <div class="compact-form-row">
+              <div class="author-input-container" style="position: relative; margin-top: 8px;">
+                <div class="form-row" style="gap: 5px;">
                   <input 
                     v-model="authorSearchQuery" 
                     @focus="isAuthorDropdownOpen = true"
-                    @blur="hideAuthorDropdown" 
                     placeholder="Начните вводить фамилию..." 
-                    class="auth-input-ln"
+                    class="half"
+                    style="padding:6px; border: 1px solid #ccc; border-radius: 4px;"
                   />
                   <input 
                     v-model="newAuthorForm.initials" 
                     placeholder="И. О." 
-                    class="auth-input-init"
+                    class="quarter" 
+                    style="padding:6px; border: 1px solid #ccc; border-radius: 4px;"
                   />
-                  
-                  <button v-if="!isAuthorEditMode" @click.prevent="handleCreateAndAddAuthor" class="auth-compact-btn green-btn" title="Создать нового автора в базе">+</button>
-                  <button v-if="isAuthorEditMode" @click.prevent="handleUpdateAuthor" class="auth-compact-btn green-btn" title="Сохранить изменения">✓</button>
-                  <button v-if="isAuthorEditMode" @click.prevent="cancelAuthorEdit" class="auth-compact-btn gray-btn" title="Отмена">×</button>
+                  <button @click.prevent="handleCreateAndAddAuthor" class="author-add-btn">
+                    + Создать и добавить
+                  </button>
                 </div>
 
                 <ul v-if="isAuthorDropdownOpen && authorSearchQuery" class="author-dropdown">
-                  <li v-for="a in filteredAuthors" :key="a.id" class="author-dropdown-item" @mousedown="addExistingAuthor(a)">
-                    <span class="auth-name-text">👤 {{ a.last_name }} {{ a.initials }}</span>
-                    <div class="auth-item-actions">
-                      <button @mousedown.stop.prevent="startEditAuthor(a)" class="auth-action-mini-btn" title="Редактировать в базе">✏️</button>
-                      <button @mousedown.stop.prevent="handleDeleteAuthor(a.id)" class="auth-action-mini-btn" title="Удалить из базы навсегда">🗑️</button>
-                    </div>
+                  <li 
+                    v-for="a in filteredAuthors" 
+                    :key="a.id" 
+                    @mousedown="addExistingAuthor(a)"
+                    class="author-dropdown-item"
+                  >
+                    👤 {{ a.last_name }} {{ a.initials }}
                   </li>
-                  <li v-if="filteredAuthors.length === 0 && !isAuthorEditMode" class="author-dropdown-item empty">
-                    В базе нет автора "{{ authorSearchQuery }}". Нажмите "+", чтобы создать.
+                  <li v-if="filteredAuthors.length === 0" class="author-dropdown-item empty">
+                    В базе нет автора "{{ authorSearchQuery }}". Заполните "И.О." и нажмите Создать.
                   </li>
                 </ul>
               </div>
