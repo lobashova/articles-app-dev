@@ -564,4 +564,34 @@ const hideAuthorDropdown = () => {
   background: #fafafa;
   cursor: default;
 }
+
+/* Убедитесь, что контейнер имеет относительное позиционирование */
+.author-input-container { 
+  position: relative; 
+  z-index: 1000; /* Увеличьте z-index до достаточно большого значения */
+}
+
+/* Выпадающий список должен быть абсолютно спозиционирован относительно контейнера */
+.author-dropdown {
+  position: absolute;
+  top: 100%; /* Позиция строго под полем ввода */
+  left: 0;
+  width: 100%;
+  max-height: 180px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  z-index: 1001; /* Должен быть выше z-index iframe */
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  list-style: none;
+  padding: 0;
+  margin: 2px 0 0 0;
+}
+
+.accordion-content {
+  padding: 15px 20px;
+  background: white;
+  overflow: visible; /* ЭТО КРИТИЧНО для отображения dropdown */
+}
 </style>
