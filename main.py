@@ -588,6 +588,15 @@ def delete_author(author_id: int, db: Session = Depends(get_db)):
     if not db_author:
         raise HTTPException(status_code=404, detail="Автор не найден")
     
-    db.delete(db_author)
-    db.commit()
-    return {"message": "Автор успешно удален из системы"}
+    try:
+        # 1. Сначала удаляем все привязки этого автора к статьям (чтобы БД не ругалась)
+        db.query(models.ArticleAuthor).filter(models.ArticleAuthor.author_id == author_id).delete()
+        
+        # 2. Теперь спокойно удаляем самого автора
+        db.delete(db_author)
+        db.commit()
+        return {"message": "Автор успешно удален из системы"}
+    except Exception as e:
+        db.rollback() # Откатываем транзакцию в случае любой непредвиденной ошибки
+        logger.error(f"Ошибка БД при удалении автора {author_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка при удалении автора")
