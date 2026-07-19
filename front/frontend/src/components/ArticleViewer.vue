@@ -474,12 +474,21 @@ const hideAuthorDropdown = () => {
 .divider { width: 10px; background-color: #f1f2f6; cursor: col-resize; display: flex; justify-content: center; align-items: center; z-index: 10; border-left: 1px solid #dfe4ea; border-right: 1px solid #dfe4ea; }
 .divider-handle { height: 30px; width: 4px; background-color: #a4b0be; border-radius: 2px; }
 
-.info-pane { height: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: -2px 0 10px rgba(0,0,0,0.05); transition: width 0.05s linear; }
+.info-pane { 
+  height: 100%; 
+  background: #fff; 
+  display: flex; 
+  flex-direction: column; 
+  box-shadow: -2px 0 10px rgba(0,0,0,0.05); 
+  transition: width 0.05s linear; 
+  overflow-y: auto; /* Добавили прокрутку сюда */
+}
+
 .info-header { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fdfdfd; }
 .save-btn { background: #2ecc71; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
 .save-btn:disabled { background: #95a5a6; }
 
-.accordion-container { overflow-y: auto; flex-grow: 1; }
+.accordion-container { overflow-y: visible; flex-grow: 1; }
 .accordion-section { border-bottom: 1px solid #eee; }
 .accordion-header { padding: 15px 20px; background: #f8f9fa; font-weight: bold; color: #2c3e50; cursor: pointer; display: flex; justify-content: space-between; user-select: none; }
 .accordion-header:hover { background: #f1f2f6; }
@@ -510,14 +519,77 @@ const hideAuthorDropdown = () => {
 .auth-compact-btn.gray-btn { background: #95a5a6; }
 
 /* ВЫПАДАЮЩИЙ СПИСОК АВТОРОВ С УПРАВЛЕНИЕМ */
-.author-dropdown { position: absolute; bottom: 100%; left: 0; width: 100%; max-height: 180px; overflow-y: auto; background: white; border: 1px solid #ccc; border-radius: 4px; z-index: 99; box-shadow: 0 -4px 12px rgba(0,0,0,0.15); padding: 0; margin: 0 0 4px 0; list-style: none; }
-.author-dropdown-item { padding: 8px 12px; cursor: pointer; font-size: 0.9em; color: #2c3e50; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f5f5f5; }
-.author-dropdown-item:hover { background-color: #3498db10; }
-.author-dropdown-item.empty { color: #7f8c8d; background: #fafafa; cursor: default; padding: 12px; }
-.auth-name-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
-.auth-item-actions { display: flex; gap: 6px; }
-.auth-action-mini-btn { background: none; border: none; cursor: pointer; font-size: 0.85em; padding: 2px; filter: grayscale(1); transition: 0.2s; }
-.auth-action-mini-btn:hover { filter: grayscale(0); transform: scale(1.15); }
+/* УПРАВЛЕНИЕ АВТОРАМИ И ВЫПАДАЮЩИЙ СПИСОК */
+.author-input-container { 
+  position: relative; 
+  z-index: 1000; 
+}
+
+.author-dropdown { 
+  position: absolute; 
+  top: 100%; /* Список открывается вниз */
+  left: 0; 
+  width: 100%; 
+  max-height: 180px; 
+  overflow-y: auto; 
+  background: white; 
+  border: 1px solid #ccc; 
+  border-radius: 4px; 
+  z-index: 1001; 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+  padding: 0; 
+  margin: 4px 0 0 0; 
+  list-style: none; 
+}
+
+.author-dropdown-item { 
+  padding: 8px 12px; 
+  cursor: pointer; 
+  font-size: 0.9em; 
+  color: #2c3e50; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  border-bottom: 1px solid #f5f5f5; 
+}
+
+.author-dropdown-item:hover { 
+  background-color: #3498db15; 
+}
+
+.author-dropdown-item.empty { 
+  color: #7f8c8d; 
+  background: #fafafa; 
+  cursor: default; 
+  padding: 12px; 
+}
+
+.auth-name-text { 
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  max-width: 70%; 
+}
+
+.auth-item-actions { 
+  display: flex; 
+  gap: 6px; 
+}
+
+.auth-action-mini-btn { 
+  background: none; 
+  border: none; 
+  cursor: pointer; 
+  font-size: 0.85em; 
+  padding: 2px; 
+  filter: grayscale(1); 
+  transition: 0.2s; 
+}
+
+.auth-action-mini-btn:hover { 
+  filter: grayscale(0); 
+  transform: scale(1.15); 
+}
 
 /* ТЕГИ */
 .tag-badge { color: white; padding: 4px 10px; border-radius: 15px; margin-right: 5px; display: inline-flex; align-items: center; font-size: 0.85em; font-weight: 500; }
