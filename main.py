@@ -271,19 +271,23 @@ def create_draft(project_id: int, title: str, db: Session = Depends(get_db)):
     db.refresh(db_draft)
     return db_draft
 
-# Эндпоинт: Получить драфт для конкретного проекта (или создать пустой, если его нет)
-@app.get("/projects/{project_id}/draft", response_model=schemas.DraftResponse)
-def get_or_create_project_draft(project_id: int, db: Session = Depends(get_db)):
-    draft = db.query(models.Draft).filter(models.Draft.project_id == project_id).first()
-    if not draft:
-        # Если черновика еще не существовало для этого проекта — автоматически создаем его
-        project = db.query(models.Project).filter(models.Project.id == project_id).first()
-        title = f"Черновик: {project.name}" if project else "Новый черновик"
-        draft = models.Draft(project_id=project_id, title=title, content="")
-        db.add(draft)
-        db.commit()
-        db.refresh(draft)
-    return draft
+# Эндпоинт: Получить список всех черновиков для конкретного проекта
+@app.get("/projects/{project_id}/drafts/", response_model=list[schemas.DraftResponse])
+def get_project_drafts(project_id: int, db: Session = Depends(get_db)):
+    # Теперь мы возвращаем все черновики проекта (списком)
+    drafts = db.query(models.Draft).filter(models.Draft.project_id == project_id).all()
+    return drafts
+
+# Эндпоинт: Удалить черновик
+@app.delete("/drafts/{draft_id}")
+def delete_draft(draft_id: int, db: Session = Depends(get_db)):
+    db_draft = db.query(models.Draft).filter(models.Draft.id == draft_id).first()
+    if not db_draft:
+        raise HTTPException(status_code=404, detail="Черновик не найден")
+    
+    db.delete(db_draft)
+    db.commit()
+    return {"message": "Черновик успешно удален"}
 
 # Эндпоинт: Сохранить/обновить текст и заголовок драфта
 @app.put("/drafts/{draft_id}")
