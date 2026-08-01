@@ -14,7 +14,9 @@ from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 import jwt
+from dotenv import load_dotenv
 
+load_dotenv()
 # Создаем таблицы, если их нет
 models.Base.metadata.create_all(bind=engine)
 
@@ -41,7 +43,7 @@ def get_db():
         yield db
     finally:
         db.close()
-        
+
 # --- НАСТРОЙКИ БЕЗОПАСНОСТИ ---
 SECRET_KEY = os.getenv("SECRET_KEY", "default_insecure_key")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
