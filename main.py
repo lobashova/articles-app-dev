@@ -157,7 +157,18 @@ def delete_project(project_id: int, db: Session = Depends(get_db)):
     db_project = db.query(models.Project).filter(models.Project.id == project_id).first()
     if not db_project:
         raise HTTPException(status_code=404, detail="Проект не найден")
+    # 1. ЗАЩИТА: Отвязываем все статьи от проекта (очищаем таблицу связей)
+    db_project.articles.clear()
     
+    # 2. ЗАЩИТА: Находим все черновики этого проекта
+    drafts = db.query(models.Draft).filter(models.Draft.project_id == project_id).all()
+    
+    # 3. ЗАЩИТА: Для каждого черновика сначала удаляем его цитаты (детей черновика)
+    for draft in drafts:
+        db.query(models.DraftCitation).filter(models.DraftCitation.draft_id == draft.id).delete()
+        
+    # 4. ЗАЩИТА: Теперь удаляем все черновики (детей проекта)
+    db.query(models.Draft).filter(models.Draft.project_id == project_id).delete()
     db.delete(db_project)
     db.commit()
     return {"message": "Проект успешно удален"}
@@ -346,7 +357,7 @@ def delete_draft(draft_id: int, db: Session = Depends(get_db)):
     db_draft = db.query(models.Draft).filter(models.Draft.id == draft_id).first()
     if not db_draft:
         raise HTTPException(status_code=404, detail="Черновик не найден")
-    
+    db.query(models.DraftCitation).filter(models.DraftCitation.draft_id == draft_id).delete()
     db.delete(db_draft)
     db.commit()
     return {"message": "Черновик успешно удален"}
