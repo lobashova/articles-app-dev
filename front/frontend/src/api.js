@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5173', // или  'https://articles-app.ru'
+  baseURL: 'https://articles-app.ru',
 });
 
 // Добавляем токен ко всем запросам
