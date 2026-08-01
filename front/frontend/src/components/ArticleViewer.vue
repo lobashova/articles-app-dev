@@ -182,7 +182,49 @@
             </div>
           </div>
         </div>
+        <div class="accordion-section">
+          <div class="accordion-header" @click="isQuotesOpen = !isQuotesOpen">
+            <span>💬 Цитаты из статьи</span>
+            <span>{{ isQuotesOpen ? '▼' : '▲' }}</span>
+          </div>
+          
+          <div v-if="isQuotesOpen" class="accordion-content">
+            <div class="new-quote-box">
+              <label>Добавить новую цитату</label>
+              <textarea 
+                v-model="newQuote.highlighted_text" 
+                rows="3" 
+                placeholder="Вставьте скопированный текст из PDF сюда..."
+              ></textarea>
+              <div class="new-quote-actions">
+                <input 
+                  type="number" 
+                  v-model="newQuote.page_number" 
+                  placeholder="Стр. (опц.)" 
+                  class="page-input"
+                />
+                <button @click="saveQuote" class="add-quote-btn" :disabled="!newQuote.highlighted_text">
+                  ➕ Сохранить цитату
+                </button>
+              </div>
+            </div>
 
+            <div v-if="quotes.length > 0" class="quotes-list">
+              <div v-for="quote in quotes" :key="quote.id" class="quote-card">
+                <p class="quote-text">«{{ quote.highlighted_text }}»</p>
+                <div class="quote-footer">
+                  <span class="quote-page">
+                    <span v-if="quote.page_number">📄 Стр. {{ quote.page_number }}</span>
+                  </span>
+                  <button @click="deleteQuote(quote.id)" class="delete-quote-btn" title="Удалить цитату">🗑️</button>
+                </div>
+              </div>
+            </div>
+            <div v-else class="empty-quotes">
+              У этой статьи пока нет сохраненных цитат.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -314,6 +356,7 @@ const initViewer = async () => {
     articleTags.value = [];
     notes.value = { aims: '', methods: '', results: '', comments: '' };
     noteIds.value = { aims: null, methods: null, results: null, comments: null };
+    quotes.value = [];
   } else {
     articleId.value = parseInt(rawId);
     if (articlesStore.list.length === 0) await articlesStore.fetchArticles();
@@ -324,6 +367,7 @@ const initViewer = async () => {
       articleData.value.authors = authRes.data;
     }
     loadNotesAndTags();
+    loadQuotes();
   }
 };
 
@@ -454,6 +498,60 @@ onMounted(() => {
 const hideAuthorDropdown = () => {
   // Даем время (200мс) на то, чтобы сработал @mousedown на элементе списка
   setTimeout(() => { isAuthorDropdownOpen.value = false; }, 200);
+};
+
+const isQuotesOpen = ref(false);
+const quotes = ref([]);
+const newQuote = ref({ highlighted_text: '', page_number: null });
+
+// Функция загрузки цитат (вызовем ее внутри initViewer)
+const loadQuotes = async () => {
+  if (isNewMode.value) return;
+  try {
+    const res = await api.get(`/articles/${articleId.value}/quotes/`);
+    quotes.value = res.data;
+  } catch (e) { 
+    console.error("Ошибка загрузки цитат:", e); 
+  }
+};
+
+// Функция сохранения новой цитаты
+const saveQuote = async () => {
+  if (!newQuote.value.highlighted_text) return;
+  
+  if (isNewMode.value) {
+    alert("Сначала сохраните саму статью (кнопка 'Сохранить всё' сверху), чтобы к ней можно было привязывать цитаты!");
+    return;
+  }
+
+  try {
+    const payload = {
+      article_id: articleId.value,
+      highlighted_text: newQuote.value.highlighted_text,
+      page_number: newQuote.value.page_number || null
+    };
+    
+    const res = await api.post('/quotes/', payload);
+    quotes.value.unshift(res.data); // Добавляем новую цитату в начало списка
+    
+    // Очищаем форму
+    newQuote.value.highlighted_text = '';
+    newQuote.value.page_number = null;
+  } catch (error) {
+    alert("Ошибка при сохранении цитаты.");
+    console.error(error);
+  }
+};
+
+// Функция удаления цитаты
+const deleteQuote = async (id) => {
+  if (!confirm("Вы уверены, что хотите удалить эту цитату?")) return;
+  try {
+    await api.delete(`/quotes/${id}`);
+    quotes.value = quotes.value.filter(q => q.id !== id);
+  } catch (error) {
+    alert("Ошибка при удалении цитаты.");
+  }
 };
 </script>
 
@@ -665,5 +763,94 @@ const hideAuthorDropdown = () => {
   padding: 15px 20px;
   background: white;
   overflow: visible; /* ЭТО КРИТИЧНО для отображения dropdown */
+}
+
+/* --- ЦИТАТЫ --- */
+.new-quote-box {
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px dashed #bdc3c7;
+  margin-bottom: 20px;
+}
+.new-quote-box label {
+  font-size: 0.85em;
+  color: #7f8c8d;
+  margin-bottom: 8px;
+  display: block;
+}
+.new-quote-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+.page-input {
+  width: 90px;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.add-quote-btn {
+  flex-grow: 1;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+.add-quote-btn:disabled {
+  background: #bdc3c7;
+  cursor: not-allowed;
+}
+
+.quotes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.quote-card {
+  background: #fff;
+  border-left: 4px solid #9b59b6;
+  padding: 12px;
+  border-radius: 0 6px 6px 0;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+}
+.quote-text {
+  font-style: italic;
+  color: #2c3e50;
+  margin: 0 0 10px 0;
+  font-size: 0.95em;
+  line-height: 1.4;
+}
+.quote-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #f1f2f6;
+  padding-top: 8px;
+}
+.quote-page {
+  font-size: 0.8em;
+  color: #7f8c8d;
+  font-weight: bold;
+}
+.delete-quote-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+.delete-quote-btn:hover {
+  filter: grayscale(0);
+  opacity: 1;
+  transform: scale(1.1);
+}
+.empty-quotes {
+  text-align: center;
+  color: #95a5a6;
+  font-style: italic;
+  padding: 20px;
 }
 </style>
