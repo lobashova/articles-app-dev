@@ -562,11 +562,11 @@ def get_article_apa(article_id: int, db: Session = Depends(get_db)):
     if not authors:
         author_str = "Автор неизвестен."
     elif len(authors) == 1:
-        author_str = f"{authors[0]}."
+        author_str = f"{authors[0]}"
     elif len(authors) == 2:
         author_str = f"{authors[0]} & {authors[1]}."
     else:
-        author_str = ", ".join(authors[:-1]) + f", & {authors[-1]}."
+        author_str = ", ".join(authors[:-1]) + f", & {authors[-1]}"
         
     # Год издания
     year_str = f"({article.year})." if article.year else "(н.д.)."
@@ -581,7 +581,7 @@ def get_article_apa(article_id: int, db: Session = Depends(get_db)):
     if article.type == "Journal Article" and article.journal:
         citation += f" {article.journal},"
         if article.issue:
-            citation += f" ({article.issue}),"
+            citation += f" {article.issue},"
         if article.pages:
             citation += f" {article.pages}."
     elif article.type == "Book":
