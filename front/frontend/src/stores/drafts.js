@@ -12,10 +12,24 @@ export const useDraftsStore = defineStore('drafts', {
     async fetchDraftForProject(projectId) {
       this.isLoading = true;
       try {
-        const response = await api.get(`/projects/${projectId}/draft`);
-        this.currentDraft = response.data;
-        await this.fetchDraftCitations(response.data.id);
-        return response.data;
+        // Добавил слэш в конце, чтобы точно совпадало с FastAPI
+        const response = await api.get(`/projects/${projectId}/drafts/`); 
+        
+        const drafts = response.data;
+        
+        // Проверяем, есть ли в массиве хотя бы один драфт
+        if (drafts && drafts.length > 0) {
+          const activeDraft = drafts[0]; // Берем первый драфт из списка
+          
+          this.currentDraft = activeDraft;
+          await this.fetchDraftCitations(activeDraft.id); // Теперь передаем правильный ID
+          return activeDraft;
+        } else {
+          // Если черновиков у проекта еще нет
+          this.currentDraft = null;
+          this.citations = [];
+          return null;
+        }
       } catch (error) {
         console.error('Ошибка при загрузке черновика:', error);
       } finally {

@@ -9,12 +9,17 @@ import parser
 from database import engine, SessionLocal
 import shutil
 import os
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from passlib.context import CryptContext
+import jwt
 
 # Создаем таблицы, если их нет
 models.Base.metadata.create_all(bind=engine)
 
 # Настройка логирования
-LOG_FILE_PATH = "/var/www/article-app/logs/app.log"
+LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "app.log")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,12 +34,67 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Article Management API")
 
+# --- НАСТРОЙКИ БЕЗОПАСНОСТИ ---
+SECRET_KEY = os.getenv("SECRET_KEY", "default_insecure_key")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ADMIN_PASSWORD = os.getenv("ADMIN_DEFAULT_PASSWORD", "admin123")
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Этот код сработает 1 раз при запуске бэкенда и создаст вам пользователя
+@app.on_event("startup")
+def create_admin_user():
+    db = SessionLocal()
+    user = db.query(models.User).filter(models.User.username == "admin").first()
+    if not user:
+        hashed_pw = pwd_context.hash(ADMIN_PASSWORD) 
+        new_user = models.User(username="admin", password_hash=hashed_pw)
+        db.add(new_user)
+        db.commit()
+    db.close()
+
+# Эндпоинт для логина (выдает пропуск-токен)
+@app.post("/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
+    if not user or not pwd_context.verify(form_data.password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Неверный логин или пароль")
+    
+    token = jwt.encode({"sub": user.username}, SECRET_KEY, algorithm=ALGORITHM)
+    return {"access_token": token, "token_type": "bearer"}
+
+# ГЛОБАЛЬНЫЙ ОХРАННИК (Middleware)
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    # Пропускаем браузерные OPTIONS-запросы (нужны для CORS)
+    if request.method == "OPTIONS":
+        return await call_next(request)
+    
+    # Список открытых путей (куда можно без пароля)
+    public_paths = ["/login", "/", "/docs", "/openapi.json"]
+    if request.url.path in public_paths or request.url.path.startswith("/uploaded_files"):
+        return await call_next(request)
+
+    # Проверяем наличие токена во всех остальных запросах
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"detail": "Not authenticated"})
+
+    token = auth_header.split(" ")[1]
+    try:
+        jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except Exception:
+        return JSONResponse(status_code=401, content={"detail": "Invalid token"})
+
+    # Если токен верный, пропускаем запрос дальше
+    response = await call_next(request)
+    return response
+# --- КОНЕЦ БЛОКА БЕЗОПАСНОСТИ ---
+
 app.mount("/uploaded_files", StaticFiles(directory="uploaded_files"), name="uploaded_files")
 
-origins = [
-    "http://localhost:5173",  # Адрес, где работает ваш Vue.js при разработке
-    "https://articles-app.ru", # Адрес вашего домена
-]
+cors_origins_str = os.getenv("CORS_ORIGINS")
+origins = cors_origins_str.split(",")
 
 app.add_middleware(
     CORSMiddleware,

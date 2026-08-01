@@ -1,5 +1,6 @@
 <template>
-  <div class="app-layout">
+  <Login v-if="!authStore.isAuthenticated" />
+  <div v-else class="app-layout">
     <GlobalSearch />
     <header class="top-bar">
       <div class="logo">📚 Приложение для статей</div>
@@ -51,6 +52,8 @@
 </template>
 
 <script setup>
+import { useAuthStore } from './stores/auth';
+import Login from './components/Login.vue';
 import { computed } from 'vue';
 import { useTabsStore } from './stores/tabs';
 import ProjectList from './components/ProjectList.vue';
@@ -60,7 +63,7 @@ import ArticleViewer from './components/ArticleViewer.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
 
 const tabsStore = useTabsStore();
-
+const authStore = useAuthStore();
 // Выбрасываем глобальное событие, которое поймает компонент GlobalSearch.vue
 const openSearchModal = () => {
   window.dispatchEvent(new Event('open-global-search'));
