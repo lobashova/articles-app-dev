@@ -34,6 +34,14 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Article Management API")
 
+# Зависимость для получения сессии базы данных
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        
 # --- НАСТРОЙКИ БЕЗОПАСНОСТИ ---
 SECRET_KEY = os.getenv("SECRET_KEY", "default_insecure_key")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
@@ -103,14 +111,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Зависимость для получения сессии базы данных
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 @app.get("/")
 def read_root():
