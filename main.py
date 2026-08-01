@@ -210,7 +210,28 @@ def delete_article(article_id: int, db: Session = Depends(get_db)):
     db_article = db.query(models.Article).filter(models.Article.id == article_id).first()
     if not db_article:
         raise HTTPException(status_code=404, detail="Статья не найдена")
+    # 1. Отвязываем теги и проекты (очищаем таблицы связей Many-to-Many)
+    db_article.tags.clear()
+    db_article.projects.clear()
     
+    # 2. Удаляем связи с авторами (сохраняя самих авторов в глобальной базе)
+    db.query(models.ArticleAuthor).filter(models.ArticleAuthor.article_id == article_id).delete()
+    
+    # 3. Удаляем все заметки к этой статье
+    db.query(models.Note).filter(models.Note.article_id == article_id).delete()
+    
+    # 4. Удаляем все сохраненные выдержки/цитаты из этой статьи
+    db.query(models.Quote).filter(models.Quote.article_id == article_id).delete()
+    
+    # 5. Удаляем все внутритекстовые ссылки (DraftCitations) на эту статью во всех черновиках
+    db.query(models.DraftCitation).filter(models.DraftCitation.article_id == article_id).delete()
+    
+    # 6. Если к статье был привязан PDF-файл, его тоже можно удалить физически с диска (опционально)
+    if db_article.pdf_path and os.path.exists(db_article.pdf_path):
+        try:
+            os.remove(db_article.pdf_path)
+        except Exception as e:
+            logger.warning(f"Не удалось удалить файл {db_article.pdf_path}: {e}")
     db.delete(db_article)
     db.commit()
     return {"message": "Статья успешно удалена"}
