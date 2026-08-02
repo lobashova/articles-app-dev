@@ -53,6 +53,7 @@ class Article(Base):
     pages = Column(String, nullable=True)
     tags = relationship("Tag", secondary=article_tags, backref="articles")
     projects = relationship("Project", secondary=project_articles, backref="articles")
+    authors = relationship("Author", secondary="article_authors", backref="articles")
 
 class Tag(Base):
     __tablename__ = "tags"
