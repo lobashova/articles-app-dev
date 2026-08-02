@@ -3,7 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 import models, schemas
 import parser
 from database import engine, SessionLocal
@@ -186,7 +186,12 @@ def create_article(article: schemas.ArticleCreate, db: Session = Depends(get_db)
 # Эндпоинт: Получить список всех статей
 @app.get("/articles/", response_model=list[schemas.ArticleResponse])
 def get_articles(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    articles = db.query(models.Article).offset(skip).limit(limit).all()
+    # Подгружаем связанные данные (авторов и теги) сразу вместе со списком статей
+    articles = db.query(models.Article).options(
+        selectinload(models.Article.authors),
+        selectinload(models.Article.tags)
+    ).offset(skip).limit(limit).all()
+    
     return articles
 
 # Эндпоинт: Обновить статью

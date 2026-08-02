@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 # Базовая схема проекта
@@ -37,11 +37,6 @@ class ArticleBase(BaseModel):
 class ArticleCreate(ArticleBase):
     pass
 
-class ArticleResponse(ArticleBase):
-    id: int
-
-    class Config:
-        from_attributes = True
 
 # --- СХЕМЫ ДЛЯ ТЕГОВ ---
 # --- СХЕМЫ ДЛЯ ТЕГОВ ---
@@ -84,6 +79,16 @@ class AuthorCreate(AuthorBase):
 
 class AuthorResponse(AuthorBase):
     id: int
+
+    class Config:
+        from_attributes = True
+
+class ArticleResponse(ArticleBase):
+    id: int
+    
+    # Добавляем связанные списки с предзаданным пустым списком
+    authors: List[AuthorResponse] = []
+    tags: List[TagResponse] = []
 
     class Config:
         from_attributes = True
