@@ -49,6 +49,7 @@ class TagCreate(TagBase):
 
 class TagResponse(TagBase):
     id: int
+    name: str
 
     class Config:
         from_attributes = True
@@ -79,6 +80,8 @@ class AuthorCreate(AuthorBase):
 
 class AuthorResponse(AuthorBase):
     id: int
+    last_name: str
+    initials: Optional[str] = None
 
     class Config:
         from_attributes = True
